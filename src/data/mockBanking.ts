@@ -1,0 +1,205 @@
+import { BankAccount, NotificationItem, QuickContact, Transaction, UserSettings } from '../types/banking';
+
+export const INITIAL_ACCOUNT: BankAccount = {
+  id: 'acc-saving-1',
+  type: 'Saving Account',
+  typeAm: 'የቁጠባ ሂሳብ',
+  maskedNumber: '1000****4829',
+  fullNumber: '1000284914829',
+  branch: 'Addis Ababa · Bole Medhanialem Branch',
+  branchAm: 'አዲስ አበባ · ቦሌ መድኃኒዓለም ቅርንጫፍ',
+  balanceEtb: 24850.75,
+  dailyLimitEtb: 75000,
+  interestRate: '7.0% p.a.',
+  iban: 'ET89 0001 1000 2849 1482 9',
+};
+
+export const INITIAL_TRANSACTIONS: Transaction[] = [
+  {
+    id: 'tx-101',
+    reference: 'FT2611230894',
+    title: 'Tomoca Coffee Roasters',
+    titleAm: 'ቶሞካ ቡና',
+    counterparty: 'Tomoca Bole Merchant #40812',
+    accountOrPhone: 'MERCH-40812',
+    category: 'merchant',
+    direction: 'debit',
+    amountEtb: 245.0,
+    feeEtb: 0,
+    timestamp: 'Today, 09:42',
+    note: 'Morning macchiato & beans',
+    status: 'Completed',
+  },
+  {
+    id: 'tx-102',
+    reference: 'FT2611229410',
+    title: 'Monthly Payroll Credit',
+    titleAm: 'ወርሃዊ ደመወዝ ገቢ',
+    counterparty: 'Horizon Tech PLC',
+    accountOrPhone: '1000991023401',
+    category: 'income',
+    direction: 'credit',
+    amountEtb: 18500.0,
+    feeEtb: 0,
+    timestamp: 'Yesterday, 17:15',
+    note: 'Hidar Payroll',
+    status: 'Completed',
+  },
+  {
+    id: 'tx-103',
+    reference: 'FT2611218821',
+    title: 'EEU Electric Utility',
+    titleAm: 'የኢትዮጵያ ኤሌክትሪክ አገልግሎት',
+    counterparty: 'Meter #0492817',
+    accountOrPhone: 'EEU-0492817',
+    category: 'bill',
+    direction: 'debit',
+    amountEtb: 682.5,
+    feeEtb: 5.0,
+    timestamp: 'Nov 21, 14:20',
+    note: 'Monthly electricity bill',
+    status: 'Completed',
+  },
+  {
+    id: 'tx-104',
+    reference: 'FT2611207105',
+    title: 'Transfer to Tigist Assefa',
+    titleAm: 'ለትግስት አሰፋ የተላከ',
+    counterparty: 'Tigist Assefa',
+    accountOrPhone: '1000412099104',
+    category: 'transfer',
+    direction: 'debit',
+    amountEtb: 2500.0,
+    feeEtb: 0,
+    timestamp: 'Nov 20, 11:05',
+    note: 'Shared dinner & taxi',
+    status: 'Completed',
+  },
+  {
+    id: 'tx-105',
+    reference: 'FT2611196042',
+    title: 'Ethio Telecom Airtime',
+    titleAm: 'ኢትዮ ቴሌኮም አየር ሰዓት',
+    counterparty: '+251 911 482 910',
+    accountOrPhone: '0911482910',
+    category: 'airtime',
+    direction: 'debit',
+    amountEtb: 150.0,
+    feeEtb: 0,
+    timestamp: 'Nov 19, 18:30',
+    status: 'Completed',
+  },
+];
+
+export const QUICK_CONTACTS: QuickContact[] = [
+  {
+    id: 'c-1',
+    name: 'Tigist Assefa',
+    nameAm: 'ትግስት አሰፋ',
+    accountNumber: '1000412099104',
+    phone: '+251 911 204 511',
+    initials: 'TA',
+  },
+  {
+    id: 'c-2',
+    name: 'Dawit Mekonnen',
+    nameAm: 'ዳዊት መኮንን',
+    accountNumber: '1000839102241',
+    phone: '+251 912 884 102',
+    initials: 'DM',
+  },
+  {
+    id: 'c-3',
+    name: 'Selamawit Tadesse',
+    nameAm: 'ሰላማዊት ታደሰ',
+    accountNumber: '1000519300482',
+    phone: '+251 711 903 441',
+    initials: 'ST',
+  },
+  {
+    id: 'c-4',
+    name: 'Yohannes Kebede',
+    nameAm: 'ዮሐንስ ከበደ',
+    accountNumber: '1000720491188',
+    phone: '+251 913 550 291',
+    initials: 'YK',
+  },
+];
+
+export const INITIAL_NOTIFICATIONS: NotificationItem[] = [
+  {
+    id: 'n-1',
+    title: 'Payroll Credit Received',
+    titleAm: 'የደመወዝ ገቢ ደርሷል',
+    detail: '18,500.00 ETB credited to Saving Account 1000****4829.',
+    detailAm: '18,500.00 ብር ወደ ቁጠባ ሂሳብዎ 1000****4829 ገብቷል።',
+    timeAgo: '1d ago',
+    read: false,
+  },
+  {
+    id: 'n-2',
+    title: 'Merchant Payment Confirmed',
+    titleAm: 'የነጋዴ ክፍያ ተረጋግጧል',
+    detail: 'Paid 245.00 ETB to Tomoca Coffee Roasters.',
+    detailAm: '245.00 ብር ለቶሞካ ቡና ተከፍሏል።',
+    timeAgo: '2h ago',
+    read: false,
+  },
+  {
+    id: 'n-3',
+    title: 'Fast Loan Limit Updated',
+    titleAm: 'የፈጣን ብድር ገደብ ታድሷል',
+    detail: 'You are pre-approved for up to 15,000.00 ETB instant loan.',
+    detailAm: 'እስከ 15,000.00 ብር ፈጣን ብድር ተፈቅዶልዎታል።',
+    timeAgo: '3d ago',
+    read: true,
+  },
+];
+
+export const INITIAL_SETTINGS: UserSettings = {
+  hideBalanceOnStart: false,
+  biometricLogin: true,
+  smsAlerts: true,
+  dailyLimitEtb: 75000,
+};
+
+export const EXTERNAL_NETWORKS = [
+  { id: 'telebirr', name: 'Telebirr Wallet', fee: 0 },
+  { id: 'mpesa', name: 'M-Pesa Safaricom', fee: 0 },
+  { id: 'cbebirr', name: 'CBEBirr Wallet', fee: 0 },
+  { id: 'awash', name: 'Awash Bank', fee: 10 },
+  { id: 'dashen', name: 'Dashen Bank', fee: 10 },
+  { id: 'abyssinia', name: 'Bank of Abyssinia', fee: 10 },
+];
+
+export const ETHIOPIAN_BILLERS = [
+  { id: 'eeu', name: 'EEU · Ethiopian Electric Utility', sampleDue: 640.0, fee: 5 },
+  { id: 'aawsa', name: 'AAWSA · Addis Ababa Water', sampleDue: 215.5, fee: 5 },
+  { id: 'fiber', name: 'Ethio Telecom · Home Fiber', sampleDue: 1490.0, fee: 0 },
+  { id: 'erca', name: 'Ministry of Revenues · Tax', sampleDue: 3250.0, fee: 0 },
+  { id: 'dstv', name: 'DStv Ethiopia Subscription', sampleDue: 1150.0, fee: 0 },
+];
+
+export const QR_PRESETS = [
+  {
+    id: 'qr-1',
+    merchant: 'Tomoca Coffee Bole',
+    merchantId: '408120',
+    amountEtb: 185,
+    note: '2 Macchiato + Pastry',
+  },
+  {
+    id: 'qr-2',
+    merchant: 'Shoa Supermarket',
+    merchantId: '882914',
+    amountEtb: 1420,
+    note: 'Weekly groceries',
+  },
+  {
+    id: 'qr-3',
+    merchant: 'Ride Meter Taxi',
+    merchantId: '219044',
+    amountEtb: 310,
+    note: 'Bole to Kazanchis',
+  },
+];

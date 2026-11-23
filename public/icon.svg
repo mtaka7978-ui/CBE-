@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5B2082" />
+      <stop offset="100%" stop-color="#7731A3" />
+    </linearGradient>
+    <linearGradient id="wire" x1="60" y1="60" x2="452" y2="452" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F6D5AE" />
+      <stop offset="50%" stop-color="#D7A14D" />
+      <stop offset="100%" stop-color="#B07428" />
+    </linearGradient>
+    <linearGradient id="coin" x1="160" y1="160" x2="352" y2="352" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F8D8B3" />
+      <stop offset="55%" stop-color="#CF935A" />
+      <stop offset="100%" stop-color="#8E5423" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <g stroke="url(#wire)" stroke-width="3.2" fill="none" opacity="0.92">
+    <g transform="rotate(-68 256 256)">
+      <ellipse cx="326" cy="256" rx="145" ry="60" />
+      <ellipse cx="326" cy="250" rx="140" ry="56" transform="rotate(-8 256 256)" />
+      <ellipse cx="326" cy="262" rx="140" ry="56" transform="rotate(8 256 256)" />
+    </g>
+    <g transform="rotate(52 256 256)">
+      <ellipse cx="326" cy="256" rx="145" ry="60" />
+      <ellipse cx="326" cy="250" rx="140" ry="56" transform="rotate(-8 256 256)" />
+      <ellipse cx="326" cy="262" rx="140" ry="56" transform="rotate(8 256 256)" />
+    </g>
+    <g transform="rotate(172 256 256)">
+      <ellipse cx="326" cy="256" rx="145" ry="60" />
+      <ellipse cx="326" cy="250" rx="140" ry="56" transform="rotate(-8 256 256)" />
+      <ellipse cx="326" cy="262" rx="140" ry="56" transform="rotate(8 256 256)" />
+    </g>
+  </g>
+  <circle cx="256" cy="256" r="108" fill="url(#coin)" stroke="#F9DFBA" stroke-width="6" />
+  <circle cx="256" cy="256" r="70" fill="none" stroke="#5D320E" stroke-width="3" opacity="0.65" />
+  <g fill="#4B270C">
+    <path d="M304 218C292 204 275 196 255 196C220 196 194 223 194 256C194 289 220 316 255 316C275 316 293 308 304 294L293 285C284 296 270 303 255 303C229 303 210 283 210 256C210 229 229 209 255 209C270 209 283 216 292 226L304 218Z" />
+    <path d="M224 217H253C266 217 275 225 275 236C275 244 270 250 263 253C271 255 277 262 277 271C277 284 267 291 253 291H224V217ZM238 228V247H251C258 247 262 243 262 238C262 232 258 228 251 228H238ZM238 258V280H252C259 280 263 276 263 270C263 263 259 258 252 258H238Z" />
+    <path d="M273 217H301V228H286V248H299V259H286V280H301V291H273V217Z" />
+  </g>
+</svg>

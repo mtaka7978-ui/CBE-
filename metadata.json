@@ -1,0 +1,6 @@
+{
+  "name": "BirrFlow Mobile Banking",
+  "description": "Bilingual (EN / አማርኛ) mobile banking dashboard and payment workspace for ETB accounts, transfers, QR pay, bills, and micro-loans.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

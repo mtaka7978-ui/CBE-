@@ -1,0 +1,11 @@
+{
+  "appId": "com.cbebank.mobile",
+  "appName": "CBE Bank",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#5B2082"
+  }
+}
