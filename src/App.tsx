@@ -36,7 +36,7 @@ import {
   QUICK_CONTACTS,
 } from './data/mockBanking';
 import { translations } from './data/translations';
-import { formatEtb, generateReference } from './utils/formatters';
+import { buildCbeSmsText, formatEtb, generateReference } from './utils/formatters';
 import { AccountCard } from './components/AccountCard';
 import { HistoryView } from './components/HistoryView';
 import { QrView } from './components/QrView';
@@ -147,16 +147,19 @@ export default function App() {
     amountEtb: number;
     feeEtb: number;
     note?: string;
+    recipientPhone?: string;
   }): Transaction | null => {
     const totalDelta = payload.amountEtb + payload.feeEtb;
     if (payload.direction === 'debit' && totalDelta > account.balanceEtb) {
       return null;
     }
 
-    const newBalance =
-      payload.direction === 'credit'
+    const newBalance = Number(
+      (payload.direction === 'credit'
         ? account.balanceEtb + payload.amountEtb
-        : account.balanceEtb - totalDelta;
+        : account.balanceEtb - totalDelta
+      ).toFixed(2)
+    );
 
     const now = new Date();
     const datePart = now.toLocaleDateString('en-US', {
@@ -170,9 +173,10 @@ export default function App() {
       hour12: true,
     });
 
+    const reference = generateReference();
     const tx: Transaction = {
       id: `tx-${Date.now()}`,
-      reference: generateReference(),
+      reference,
       title: payload.title,
       titleAm: payload.titleAm,
       counterparty: payload.counterparty,
@@ -183,22 +187,37 @@ export default function App() {
       feeEtb: payload.feeEtb,
       timestamp: `${datePart} ${timePart}`,
       note: payload.note,
+      recipientPhone: payload.recipientPhone,
+      balanceAfterEtb: newBalance,
       status: 'Completed',
     };
 
-    setAccount((prev) => ({ ...prev, balanceEtb: Number(newBalance.toFixed(2)) }));
+    const smsMessage = buildCbeSmsText({
+      holderName: 'Abebe Kebede',
+      accountNumber: account.fullNumber,
+      amountEtb: payload.amountEtb,
+      feeEtb: payload.feeEtb,
+      currentBalanceEtb: newBalance,
+      reference,
+      direction: payload.direction,
+      counterparty: payload.counterparty,
+    });
+
+    setAccount((prev) => ({ ...prev, balanceEtb: newBalance }));
     setTransactions((prev) => [tx, ...prev]);
 
-    const notif: NotificationItem = {
-      id: `n-${Date.now()}`,
-      title: payload.title,
-      titleAm: payload.titleAm,
-      detail: `${payload.direction === 'credit' ? '+' : '-'}${formatEtb(payload.amountEtb)} · Ref ${tx.reference}`,
-      detailAm: `${payload.direction === 'credit' ? '+' : '-'}${formatEtb(payload.amountEtb)} · መለያ ${tx.reference}`,
-      timeAgo: 'Just now',
-      read: false,
-    };
-    setNotifications((prev) => [notif, ...prev]);
+    if (settings.smsAlerts) {
+      const notif: NotificationItem = {
+        id: `n-${Date.now()}`,
+        title: `CBE SMS · ${payload.title}`,
+        titleAm: `ሲቢኢ ኤስኤምኤስ · ${payload.titleAm}`,
+        detail: smsMessage,
+        detailAm: smsMessage,
+        timeAgo: 'Just now',
+        read: false,
+      };
+      setNotifications((prev) => [notif, ...prev]);
+    }
     showToast(t.paymentSuccess);
     return tx;
   };

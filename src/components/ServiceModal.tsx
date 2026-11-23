@@ -4,7 +4,9 @@ import {
   Check,
   Copy,
   Download,
+  MessageSquare,
   Repeat,
+  Send,
   ShieldCheck,
   X,
 } from 'lucide-react';
@@ -19,7 +21,7 @@ import {
 } from '../types/banking';
 import { TranslationStrings } from '../data/translations';
 import { ETHIOPIAN_BILLERS, EXTERNAL_NETWORKS, QUICK_CONTACTS } from '../data/mockBanking';
-import { formatEtb, getCbeFeeBreakdown } from '../utils/formatters';
+import { buildCbeSmsText, formatEtb, getCbeFeeBreakdown } from '../utils/formatters';
 import { QrView } from './QrView';
 import { QrMatrix } from './QrMatrix';
 import { CbeLogo } from './CbeLogo';
@@ -34,6 +36,7 @@ interface ExecutePayload {
   amountEtb: number;
   feeEtb: number;
   note?: string;
+  recipientPhone?: string;
 }
 
 interface ServiceModalProps {
@@ -67,6 +70,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
 }) => {
   const [recipient, setRecipient] = useState('');
   const [recipientAccount, setRecipientAccount] = useState('');
+  const [recipientPhone, setRecipientPhone] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('1234');
@@ -80,11 +84,17 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
   const [showQrData, setShowQrData] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [smsCopied, setSmsCopied] = useState(false);
+  const [receiptSmsPhone, setReceiptSmsPhone] = useState('');
 
   useEffect(() => {
     setError(null);
     setCashoutCode(null);
     setShowQrData(false);
+    setSmsCopied(false);
+    if (modal?.type === 'receipt') {
+      setReceiptSmsPhone(modal.transaction.recipientPhone ?? '');
+    }
     if (modal?.type === 'service') {
       const preset = modal.presetRecipient ?? '';
       const matchedContact = QUICK_CONTACTS.find(
@@ -93,9 +103,11 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       if (matchedContact) {
         setRecipient(language === 'am' ? matchedContact.nameAm : matchedContact.name);
         setRecipientAccount(matchedContact.accountNumber);
+        setRecipientPhone(matchedContact.phone);
       } else {
         setRecipient(preset);
         setRecipientAccount(modal.serviceId === 'send' ? '' : preset);
+        setRecipientPhone('');
       }
       setAmount(modal.presetAmount ? String(modal.presetAmount) : '');
       setNote('');
@@ -224,6 +236,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
         amountEtb: numericAmount,
         feeEtb,
         note: note.trim() || 'MB Transfer',
+        recipientPhone: recipientPhone.trim() || undefined,
       };
     } else if (serviceId === 'transfers') {
       const net = EXTERNAL_NETWORKS.find((n) => n.id === networkId)!;
@@ -250,6 +263,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
         direction: 'debit',
         amountEtb: numericAmount,
         feeEtb: 0,
+        recipientPhone: phone,
       };
     } else if (serviceId === 'bills') {
       const biller = ETHIOPIAN_BILLERS.find((b) => b.id === billerId)!;
@@ -460,7 +474,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                         </p>
                         <span className="text-xs text-slate-400 whitespace-nowrap">{n.timeAgo}</span>
                       </div>
-                      <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                      <p className="mt-1 whitespace-pre-line break-words text-xs leading-relaxed text-slate-600">
                         {language === 'am' ? n.detailAm : n.detail}
                       </p>
                     </div>
@@ -499,6 +513,31 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
             `Total: ETB ${totalAmount.toFixed(2)}`,
             `Date: ${tx.timestamp}`,
           ].join('\n');
+
+          const smsText = buildCbeSmsText({
+            holderName: 'Abebe Kebede',
+            accountNumber: account.fullNumber,
+            amountEtb: tx.amountEtb,
+            feeEtb: tx.feeEtb,
+            currentBalanceEtb: tx.balanceAfterEtb ?? account.balanceEtb,
+            reference: tx.reference,
+            direction: tx.direction,
+            counterparty: tx.counterparty,
+          });
+          const cleanSmsPhone = receiptSmsPhone.replace(/[^\d+]/g, '');
+          const smsHref = cleanSmsPhone
+            ? `sms:${cleanSmsPhone}?body=${encodeURIComponent(smsText)}`
+            : `sms:?body=${encodeURIComponent(smsText)}`;
+
+          const handleCopySms = async () => {
+            try {
+              await navigator.clipboard.writeText(smsText);
+            } catch {
+              // Ignore clipboard errors
+            }
+            setSmsCopied(true);
+            setTimeout(() => setSmsCopied(false), 1800);
+          };
 
           return (
             <div className="min-h-full bg-white">
@@ -693,6 +732,69 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                     </button>
                   )}
                 </div>
+
+                {/* Official CBE SMS Alert Card + Send Text to Transaction Person */}
+                <div className="mt-4 rounded-2xl border border-slate-200/80 bg-[#1B1D24] p-4 text-white">
+                  <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 text-[#E8C16F]" />
+                      <span className="text-xs font-semibold text-[#E8C16F]">
+                        {language === 'am' ? 'የሲቢኢ ኤስኤምኤስ መልዕክት' : 'CBE Transaction SMS'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="mt-3 whitespace-pre-line break-words text-xs leading-relaxed text-slate-100">
+                    {smsText}
+                  </p>
+
+                  <div className="mt-3">
+                    <label className="block text-[11px] font-medium text-white/70">
+                      {language === 'am' ? 'የተቀባይ ስልክ ቁጥር' : 'Recipient Phone Number'}
+                    </label>
+                    <input
+                      type="tel"
+                      value={receiptSmsPhone}
+                      onChange={(e) => setReceiptSmsPhone(e.target.value)}
+                      placeholder="+251 911 204 511"
+                      className="mt-1 min-h-[40px] w-full rounded-xl border border-white/15 bg-white/10 px-3 font-mono-nums text-xs text-white placeholder:text-white/40 focus:border-[#E8C16F] focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleCopySms}
+                      className="flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+                    >
+                      {smsCopied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                      <span>
+                        {smsCopied
+                          ? t.copied
+                          : language === 'am'
+                            ? 'መልዕክት ቅዳ'
+                            : 'Copy SMS'}
+                      </span>
+                    </button>
+
+                    <a
+                      href={smsHref}
+                      target="_top"
+                      className="flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl bg-[#E8C16F] px-3 text-xs font-bold text-slate-950 transition-colors hover:bg-[#DFB55B]"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      <span>
+                        {language === 'am' ? 'በኤስኤምኤስ ላክ' : 'Send SMS Text'}
+                      </span>
+                    </a>
+                  </div>
+
+                  <p className="mt-2.5 text-[11px] leading-relaxed text-white/60">
+                    {language === 'am'
+                      ? 'የስልክዎን የመልዕክት (Messages) መተግበሪያ ይከፍታል — ለመላክ በስልክዎ ላይ Send ይንኩ።'
+                      : 'Opens your phone’s Messages app pre-filled — tap Send in Messages to deliver via your SIM.'}
+                  </p>
+                </div>
               </div>
             </div>
           );
@@ -758,6 +860,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                           onClick={() => {
                             setRecipient(language === 'am' ? c.nameAm : c.name);
                             setRecipientAccount(c.accountNumber);
+                            setRecipientPhone(c.phone);
                           }}
                           className={`min-h-[40px] rounded-xl border px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
                             recipientAccount === c.accountNumber
@@ -848,31 +951,46 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                 )}
 
                 {modal.serviceId === 'send' && (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600">
-                        {t.accountNumber}
-                      </label>
-                      <input
-                        type="text"
-                        value={recipientAccount}
-                        onChange={(e) => setRecipientAccount(e.target.value)}
-                        required
-                        placeholder="1000412099104"
-                        className="mt-1.5 min-h-[44px] w-full rounded-xl border border-slate-200 bg-[#F6F5FA] px-3.5 font-mono-nums text-sm text-slate-900 focus:border-[#4A148C] focus:bg-white focus:outline-none"
-                      />
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600">
+                          {t.accountNumber}
+                        </label>
+                        <input
+                          type="text"
+                          value={recipientAccount}
+                          onChange={(e) => setRecipientAccount(e.target.value)}
+                          required
+                          placeholder="1000412099104"
+                          className="mt-1.5 min-h-[44px] w-full rounded-xl border border-slate-200 bg-[#F6F5FA] px-3.5 font-mono-nums text-sm text-slate-900 focus:border-[#4A148C] focus:bg-white focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600">
+                          {language === 'am' ? 'የተቀባይ ስም' : 'Recipient Name'}
+                        </label>
+                        <input
+                          type="text"
+                          value={recipient}
+                          onChange={(e) => setRecipient(e.target.value)}
+                          required
+                          placeholder="Tsgie Mesho Mesfn"
+                          className="mt-1.5 min-h-[44px] w-full rounded-xl border border-slate-200 bg-[#F6F5FA] px-3.5 text-sm text-slate-900 focus:border-[#4A148C] focus:bg-white focus:outline-none"
+                        />
+                      </div>
                     </div>
+
                     <div>
                       <label className="block text-xs font-medium text-slate-600">
-                        {language === 'am' ? 'የተቀባይ ስም' : 'Recipient Name'}
+                        {language === 'am' ? 'የተቀባይ ስልክ (ለኤስኤምኤስ አማራጭ)' : 'Recipient Phone (Optional for SMS)'}
                       </label>
                       <input
-                        type="text"
-                        value={recipient}
-                        onChange={(e) => setRecipient(e.target.value)}
-                        required
-                        placeholder="Tsgie Mesho Mesfn"
-                        className="mt-1.5 min-h-[44px] w-full rounded-xl border border-slate-200 bg-[#F6F5FA] px-3.5 text-sm text-slate-900 focus:border-[#4A148C] focus:bg-white focus:outline-none"
+                        type="tel"
+                        value={recipientPhone}
+                        onChange={(e) => setRecipientPhone(e.target.value)}
+                        placeholder="+251 911 204 511"
+                        className="mt-1.5 min-h-[44px] w-full rounded-xl border border-slate-200 bg-[#F6F5FA] px-3.5 font-mono-nums text-sm text-slate-900 focus:border-[#4A148C] focus:bg-white focus:outline-none"
                       />
                     </div>
                   </div>

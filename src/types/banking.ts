@@ -35,6 +35,8 @@ export interface Transaction {
   feeEtb: number;
   timestamp: string;
   note?: string;
+  recipientPhone?: string;
+  balanceAfterEtb?: number;
   status: 'Completed' | 'Pending';
 }
 
