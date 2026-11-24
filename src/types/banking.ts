@@ -13,7 +13,13 @@ export type ServiceId =
   | 'loan';
 
 export type ModalContext =
-  | { type: 'service'; serviceId: ServiceId; presetRecipient?: string; presetAmount?: number }
+  | {
+      type: 'service';
+      serviceId: ServiceId;
+      presetRecipient?: string;
+      presetAmount?: number;
+      presetBillerId?: string;
+    }
   | { type: 'miniStatement' }
   | { type: 'accountDetails' }
   | { type: 'receipt'; transaction: Transaction }

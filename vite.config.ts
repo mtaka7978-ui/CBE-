@@ -5,6 +5,40 @@ import path from 'path';
 import {defineConfig} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
 
+const pwaManifest = {
+  id: '/',
+  name: 'CBE Bank Mobile Banking',
+  short_name: 'CBE Bank',
+  description:
+    'Bilingual (EN / አማርኛ) mobile banking app for ETB accounts, transfers, QR pay, bills, and micro-loans.',
+  theme_color: '#5B2082',
+  background_color: '#5B2082',
+  display: 'standalone' as const,
+  orientation: 'portrait' as const,
+  start_url: '/',
+  scope: '/',
+  icons: [
+    {
+      src: '/pwa-192x192.png',
+      sizes: '192x192',
+      type: 'image/png',
+      purpose: 'any',
+    },
+    {
+      src: '/pwa-512x512.png',
+      sizes: '512x512',
+      type: 'image/png',
+      purpose: 'any',
+    },
+    {
+      src: '/pwa-maskable-512x512.png',
+      sizes: '512x512',
+      type: 'image/png',
+      purpose: 'maskable',
+    },
+  ],
+};
+
 export default defineConfig(() => {
   return {
     plugins: [
@@ -13,39 +47,7 @@ export default defineConfig(() => {
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['apple-touch-icon.png', 'icon.svg'],
-        manifest: {
-          id: '/',
-          name: 'CBE Bank Mobile Banking',
-          short_name: 'CBE Bank',
-          description:
-            'Bilingual (EN / አማርኛ) mobile banking app for ETB accounts, transfers, QR pay, bills, and micro-loans.',
-          theme_color: '#5B2082',
-          background_color: '#5B2082',
-          display: 'standalone',
-          orientation: 'portrait',
-          start_url: '/',
-          scope: '/',
-          icons: [
-            {
-              src: '/pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: '/pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: '/pwa-maskable-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable',
-            },
-          ],
-        },
+        manifest: pwaManifest,
         workbox: {
           cleanupOutdatedCaches: true,
           clientsClaim: true,
@@ -83,10 +85,28 @@ export default defineConfig(() => {
           ],
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
+      {
+        name: 'serve-dev-manifest',
+        apply: 'serve',
+        transformIndexHtml(html: string) {
+          if (html.includes('manifest.webmanifest')) return html;
+          return html.replace('</head>', '  <link rel="manifest" href="/manifest.webmanifest" />\n  </head>');
+        },
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            if (req.url === '/manifest.webmanifest') {
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/manifest+json');
+              res.end(JSON.stringify(pwaManifest, null, 2));
+              return;
+            }
+            next();
+          });
+        },
+      },
       // Copies src/assets into dist/ so root-relative URLs like
       // "/src/assets/images/..." (e.g. generate_image output) still resolve
       // in production builds. Do not remove.

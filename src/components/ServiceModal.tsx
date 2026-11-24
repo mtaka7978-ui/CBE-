@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import {
   Bell,
   Check,
   Copy,
-  Download,
   MessageSquare,
-  Repeat,
+  ReceiptText,
+  Scan,
   Send,
+  Share2,
   ShieldCheck,
   X,
 } from 'lucide-react';
@@ -50,7 +52,12 @@ interface ServiceModalProps {
   onClose: () => void;
   onExecuteTransaction: (payload: ExecutePayload) => Transaction | null;
   onSelectTransaction: (tx: Transaction) => void;
-  onOpenService: (serviceId: ServiceId, presetRecipient?: string, presetAmount?: number) => void;
+  onOpenService: (
+    serviceId: ServiceId,
+    presetRecipient?: string,
+    presetAmount?: number,
+    presetBillerId?: string
+  ) => void;
   onMarkAllRead: () => void;
 }
 
@@ -86,12 +93,14 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [smsCopied, setSmsCopied] = useState(false);
   const [receiptSmsPhone, setReceiptSmsPhone] = useState('');
+  const [receiptFeedback, setReceiptFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     setError(null);
     setCashoutCode(null);
     setShowQrData(false);
     setSmsCopied(false);
+    setReceiptFeedback(null);
     if (modal?.type === 'receipt') {
       setReceiptSmsPhone(modal.transaction.recipientPhone ?? '');
     }
@@ -112,9 +121,10 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       setAmount(modal.presetAmount ? String(modal.presetAmount) : '');
       setNote('');
       if (modal.serviceId === 'bills') {
-        const first = ETHIOPIAN_BILLERS[0];
-        setBillerId(first.id);
-        setAmount(String(first.sampleDue));
+        const selected =
+          ETHIOPIAN_BILLERS.find((b) => b.id === modal.presetBillerId) ?? ETHIOPIAN_BILLERS[0];
+        setBillerId(selected.id);
+        setAmount(String(modal.presetAmount ?? selected.sampleDue));
       }
       if (modal.serviceId === 'airtime' && !modal.presetRecipient) {
         setRecipient('0911482910');
@@ -138,15 +148,20 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     }
   };
 
+  const showReceiptNote = (msg: string) => {
+    setReceiptFeedback(msg);
+    setTimeout(() => setReceiptFeedback(null), 2200);
+  };
+
   const handleDownloadReceipt = (tx: Transaction) => {
     const fromText =
       tx.direction === 'debit'
-        ? `Abebe Kebede (${account.fullNumber})`
+        ? `Teka Wondimu Kerkela (${account.fullNumber})`
         : `${tx.counterparty} (${tx.accountOrPhone})`;
     const toText =
       tx.direction === 'debit'
         ? `${tx.counterparty} (${tx.accountOrPhone})`
-        : `Abebe Kebede (${account.fullNumber})`;
+        : `Teka Wondimu Kerkela (${account.fullNumber})`;
 
     const content = [
       'CBE BANK MOBILE BANKING RECEIPT',
@@ -174,6 +189,157 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    showReceiptNote(language === 'am' ? 'ደረሰኝ ተቀምጧል' : 'Receipt saved');
+  };
+
+  const handleScreenshotReceipt = async (
+    tx: Transaction,
+    summaryText: string,
+    qrPayload: string
+  ) => {
+    try {
+      const qrDataUrl = await QRCode.toDataURL(qrPayload, {
+        width: 240,
+        margin: 1,
+        color: { dark: '#111111', light: '#FFFFFF' },
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 760;
+      canvas.height = 1040;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // White card background
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Purple header
+      ctx.fillStyle = '#6A1B9A';
+      ctx.fillRect(0, 0, canvas.width, 165);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 30px sans-serif';
+      ctx.fillText('Thank you', 44, 72);
+      ctx.font = '20px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.88)';
+      ctx.fillText('Success', 44, 102);
+
+      // Overlapping checkmark circle
+      ctx.beginPath();
+      ctx.arc(380, 165, 58, 0, Math.PI * 2);
+      ctx.fillStyle = '#6A1B9A';
+      ctx.fill();
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.stroke();
+
+      // White check stroke
+      ctx.beginPath();
+      ctx.moveTo(354, 165);
+      ctx.lineTo(372, 184);
+      ctx.lineTo(408, 146);
+      ctx.lineWidth = 9;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.stroke();
+
+      // Completed heading
+      ctx.fillStyle = '#0F172A';
+      ctx.font = '600 24px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Transaction Completed Successfully!', 380, 265);
+
+      // Gray Summary box
+      ctx.fillStyle = '#F4F4F6';
+      ctx.beginPath();
+      ctx.roundRect(44, 298, 672, 680, 24);
+      ctx.fill();
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#64748B';
+      ctx.font = '500 20px sans-serif';
+      ctx.fillText('Transaction Summary', 74, 344);
+
+      // Wrap summary text
+      ctx.fillStyle = '#1E293B';
+      ctx.font = '22px sans-serif';
+      const words = summaryText.split(/\s+/);
+      let line = '';
+      let y = 392;
+      const maxWidth = 612;
+      for (const word of words) {
+        const test = line ? `${line} ${word}` : word;
+        if (ctx.measureText(test).width > maxWidth) {
+          ctx.fillText(line, 74, y);
+          line = word;
+          y += 32;
+        } else {
+          line = test;
+        }
+      }
+      if (line) {
+        ctx.fillText(line, 74, y);
+      }
+
+      // Draw QR code image
+      const qrImg = new Image();
+      await new Promise<void>((resolve, reject) => {
+        qrImg.onload = () => resolve();
+        qrImg.onerror = () => reject(new Error('QR image load failed'));
+        qrImg.src = qrDataUrl;
+      });
+      const qrSize = 230;
+      const qrX = (canvas.width - qrSize) / 2;
+      const qrY = Math.max(y + 42, 610);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.roundRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 18);
+      ctx.fill();
+      ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+
+      // CBE footer text
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#334155';
+      ctx.font = 'bold 22px sans-serif';
+      ctx.fillText('Commercial Bank of Ethiopia', 380, qrY + qrSize + 52);
+      ctx.fillStyle = '#64748B';
+      ctx.font = '18px sans-serif';
+      ctx.fillText('The bank you can always rely on!', 380, qrY + qrSize + 82);
+
+      const pngUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = pngUrl;
+      link.download = `${tx.reference}-cbe-screenshot.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showReceiptNote(language === 'am' ? 'ስክሪንሾት ተቀምጧል' : 'Screenshot saved');
+    } catch {
+      handleDownloadReceipt(tx);
+    }
+  };
+
+  const handleShareReceipt = async (tx: Transaction, summaryText: string) => {
+    const shareText = `Commercial Bank of Ethiopia\n${summaryText}`;
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: `CBE Receipt · ${tx.reference}`,
+          text: shareText,
+        });
+        return;
+      } catch {
+        // Fallback to copy if share canceled or unsupported
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(shareText);
+    } catch {
+      // Ignore clipboard failures
+    }
+    showReceiptNote(language === 'am' ? 'ደረሰኙ ተቀድቷል' : 'Receipt copied to share');
   };
 
   const handleServiceSubmit = (e: React.FormEvent) => {
@@ -375,7 +541,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
             <div className="divide-y divide-slate-100 rounded-xl border border-slate-200/80 px-4">
               <div className="flex items-center justify-between py-3.5 text-sm">
                 <span className="text-slate-500">{t.accountHolder}</span>
-                <span className="font-semibold text-slate-900">Abebe Kebede</span>
+                <span className="font-semibold text-slate-900">Teka Wondimu Kerkela</span>
               </div>
               <div className="flex items-center justify-between py-3.5 text-sm">
                 <span className="text-slate-500">{t.accountNumber}</span>
@@ -496,12 +662,12 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
 
           const fromLabel =
             tx.direction === 'debit'
-              ? `Abebe Kebede (${account.fullNumber})`
+              ? `Teka Wondimu Kerkela (${account.fullNumber})`
               : `${tx.counterparty} (${tx.accountOrPhone})`;
           const toLabel =
             tx.direction === 'debit'
               ? `${tx.counterparty} (${tx.accountOrPhone})`
-              : `Abebe Kebede (${account.fullNumber})`;
+              : `Teka Wondimu Kerkela (${account.fullNumber})`;
 
           const qrTransferPayload = [
             `CBE TRANSFER`,
@@ -514,8 +680,10 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
             `Date: ${tx.timestamp}`,
           ].join('\n');
 
+          const smsRecipientName =
+            tx.direction === 'debit' ? tx.counterparty : 'Teka Wondimu Kerkela';
           const smsText = buildCbeSmsText({
-            holderName: 'Abebe Kebede',
+            holderName: smsRecipientName,
             accountNumber: account.fullNumber,
             amountEtb: tx.amountEtb,
             feeEtb: tx.feeEtb,
@@ -539,6 +707,11 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
             setTimeout(() => setSmsCopied(false), 1800);
           };
 
+          const summaryPlainText =
+            tx.direction === 'debit'
+              ? `ETB ${tx.amountEtb.toFixed(2)} has been debited from Teka Wondimu Kerkela ETB-${senderTail} for ${tx.counterparty} ETB-${recipientDigits} on ${tx.timestamp} with transaction ID: ${tx.reference}. Reason: ${reasonText} Total Amount Debited: ETB${totalAmount.toFixed(2)} with Service Charge of ETB${fees.serviceCharge.toFixed(2)}, VAT (15%) of ETB${fees.vat.toFixed(2)} and Disaster Recovery (5%) of ETB${fees.disasterRecovery.toFixed(2)}.`
+              : `ETB ${tx.amountEtb.toFixed(2)} has been credited to Teka Wondimu Kerkela ETB-${senderTail} from ${tx.counterparty} on ${tx.timestamp} with transaction ID: ${tx.reference}. Reason: ${reasonText} Total Amount Credited: ETB${tx.amountEtb.toFixed(2)}.`;
+
           return (
             <div className="min-h-full bg-white">
               {/* Sticky Purple Receipt Top Bar */}
@@ -560,11 +733,14 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
 
                   <button
                     type="button"
-                    onClick={onClose}
-                    aria-label={t.close}
-                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-white/85 transition-colors hover:bg-white/15 hover:text-white"
+                    onClick={() =>
+                      handleScreenshotReceipt(tx, summaryPlainText, qrTransferPayload)
+                    }
+                    aria-label={language === 'am' ? 'ስክሪንሾት' : 'Screenshot'}
+                    title={language === 'am' ? 'ስክሪንሾት' : 'Screenshot'}
+                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-white/90 transition-colors hover:bg-white/15 hover:text-white"
                   >
-                    <X className="h-5 w-5" />
+                    <Scan className="h-6 w-6" />
                   </button>
                 </div>
               </div>
@@ -598,7 +774,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                       </span>{' '}
                       has been debited from{' '}
                       <span className="font-bold text-slate-950">
-                        Abebe Kebede ETB-{senderTail}
+                        Teka Wondimu Kerkela ETB-{senderTail}
                       </span>{' '}
                       for{' '}
                       <span className="font-bold text-slate-950">
@@ -632,7 +808,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                       </span>{' '}
                       has been credited to{' '}
                       <span className="font-bold text-slate-950">
-                        Abebe Kebede ETB-{senderTail}
+                        Teka Wondimu Kerkela ETB-{senderTail}
                       </span>{' '}
                       from <span className="font-bold text-slate-950">{tx.counterparty}</span> on{' '}
                       <span className="font-bold text-slate-950">{tx.timestamp}</span> with
@@ -702,36 +878,51 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                {/* 3-Item Receipt Action Row (Receipt | Screenshot | Share) + Full-Width Close Button */}
+                <div className="mt-5 grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => handleDownloadReceipt(tx)}
-                    className="flex min-h-[46px] items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+                    className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs sm:text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 whitespace-nowrap"
                   >
-                    <Download className="h-4 w-4" />
-                    <span>{t.downloadReceipt}</span>
+                    <ReceiptText className="h-4 w-4 text-slate-700 shrink-0" />
+                    <span>{language === 'am' ? 'ደረሰኝ' : 'Receipt'}</span>
                   </button>
 
-                  {tx.category === 'transfer' ? (
-                    <button
-                      type="button"
-                      onClick={() => onOpenService('send', tx.counterparty, tx.amountEtb)}
-                      className="flex min-h-[46px] items-center justify-center gap-2 rounded-xl bg-[#6A1B9A] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#571482]"
-                    >
-                      <Repeat className="h-4 w-4" />
-                      <span>{t.repeatTransfer}</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="flex min-h-[46px] items-center justify-center rounded-xl bg-[#6A1B9A] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#571482]"
-                    >
-                      {t.close}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleScreenshotReceipt(tx, summaryPlainText, qrTransferPayload)
+                    }
+                    className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs sm:text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 whitespace-nowrap"
+                  >
+                    <Scan className="h-4 w-4 text-slate-700 shrink-0" />
+                    <span>{language === 'am' ? 'ስክሪንሾት' : 'Screenshot'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleShareReceipt(tx, summaryPlainText)}
+                    className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs sm:text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 whitespace-nowrap"
+                  >
+                    <Share2 className="h-4 w-4 text-slate-700 shrink-0" />
+                    <span>{language === 'am' ? 'አጋራ' : 'Share'}</span>
+                  </button>
                 </div>
+
+                {receiptFeedback && (
+                  <p className="mt-1.5 text-center text-xs font-medium text-[#6A1B9A]">
+                    {receiptFeedback}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="mt-2.5 flex min-h-[50px] w-full items-center justify-center rounded-full bg-[#E3E5EA] px-6 text-base font-semibold text-slate-700 transition-colors hover:bg-[#D5D8E0] active:scale-[0.99]"
+                >
+                  {t.close}
+                </button>
 
                 {/* Official CBE SMS Alert Card + Send Text to Transaction Person */}
                 <div className="mt-4 rounded-2xl border border-slate-200/80 bg-[#1B1D24] p-4 text-white">

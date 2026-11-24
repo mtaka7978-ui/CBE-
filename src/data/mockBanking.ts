@@ -4,14 +4,14 @@ export const INITIAL_ACCOUNT: BankAccount = {
   id: 'acc-saving-1',
   type: 'Saving Account',
   typeAm: 'የቁጠባ ሂሳብ',
-  maskedNumber: '1000****4829',
-  fullNumber: '1000284914829',
+  maskedNumber: '1 **** 3347',
+  fullNumber: '1000284913347',
   branch: 'Addis Ababa · Bole Medhanialem Branch',
   branchAm: 'አዲስ አበባ · ቦሌ መድኃኒዓለም ቅርንጫፍ',
   balanceEtb: 24850.75,
   dailyLimitEtb: 75000,
   interestRate: '7.0% p.a.',
-  iban: 'ET89 0001 1000 2849 1482 9',
+  iban: 'ET89 0001 1000 2849 1334 7',
 };
 
 export const INITIAL_TRANSACTIONS: Transaction[] = [
@@ -178,6 +178,8 @@ export const ETHIOPIAN_BILLERS = [
   { id: 'fiber', name: 'Ethio Telecom · Home Fiber', sampleDue: 1490.0, fee: 0 },
   { id: 'erca', name: 'Ministry of Revenues · Tax', sampleDue: 3250.0, fee: 0 },
   { id: 'dstv', name: 'DStv Ethiopia Subscription', sampleDue: 1150.0, fee: 0 },
+  { id: 'travel', name: 'Ethiopian Airlines · Travel', sampleDue: 4850.0, fee: 0 },
+  { id: 'esl', name: 'Ethiopian Shipping & Logistics (ESL)', sampleDue: 2750.0, fee: 0 },
 ];
 
 export const QR_PRESETS = [

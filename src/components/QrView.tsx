@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { QrCode, ScanLine } from 'lucide-react';
 import { BankAccount, Language } from '../types/banking';
 import { TranslationStrings } from '../data/translations';
@@ -10,12 +10,22 @@ interface QrViewProps {
   account: BankAccount;
   language: Language;
   t: TranslationStrings;
+  initialMode?: 'scan' | 'myqr';
   onScanPresetPay: (merchant: string, merchantId: string, amountEtb: number, note: string) => void;
 }
 
-export const QrView: React.FC<QrViewProps> = ({ account, t, onScanPresetPay }) => {
-  const [mode, setMode] = useState<'scan' | 'myqr'>('scan');
+export const QrView: React.FC<QrViewProps> = ({
+  account,
+  t,
+  initialMode = 'scan',
+  onScanPresetPay,
+}) => {
+  const [mode, setMode] = useState<'scan' | 'myqr'>(initialMode);
   const [requestAmount, setRequestAmount] = useState('');
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
 
   const payload = `CBEBANK:${account.fullNumber}:${requestAmount ? Number(requestAmount).toFixed(2) : 'ANY'}`;
 
