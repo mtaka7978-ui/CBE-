@@ -46,7 +46,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['apple-touch-icon.png', 'icon.svg'],
+        includeAssets: ['apple-touch-icon.png', 'cbe-logo.png', 'icon.svg'],
         manifest: pwaManifest,
         workbox: {
           cleanupOutdatedCaches: true,
@@ -97,10 +97,29 @@ export default defineConfig(() => {
         },
         configureServer(server) {
           server.middlewares.use((req, res, next) => {
-            if (req.url === '/manifest.webmanifest') {
+            const url = req.url ?? '';
+            if (url === '/manifest.webmanifest') {
               res.statusCode = 200;
               res.setHeader('Content-Type', 'application/manifest+json');
               res.end(JSON.stringify(pwaManifest, null, 2));
+              return;
+            }
+            if (url.startsWith('/dev-sw.js') || url.startsWith('/sw.js')) {
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+              res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+              res.end(`
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+    await self.registration.unregister();
+  })());
+});
+`);
               return;
             }
             next();

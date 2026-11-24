@@ -5,6 +5,7 @@ import {
   Check,
   Copy,
   MessageSquare,
+  MoreHorizontal,
   ReceiptText,
   Scan,
   Send,
@@ -23,7 +24,7 @@ import {
 } from '../types/banking';
 import { TranslationStrings } from '../data/translations';
 import { ETHIOPIAN_BILLERS, EXTERNAL_NETWORKS, QUICK_CONTACTS } from '../data/mockBanking';
-import { buildCbeSmsText, formatEtb, getCbeFeeBreakdown } from '../utils/formatters';
+import { buildCbeSmsText, formatCbeAmount, formatEtb, getCbeFeeBreakdown } from '../utils/formatters';
 import { QrView } from './QrView';
 import { QrMatrix } from './QrMatrix';
 import { CbeLogo } from './CbeLogo';
@@ -39,6 +40,7 @@ interface ExecutePayload {
   feeEtb: number;
   note?: string;
   recipientPhone?: string;
+  recipientBalanceEtb?: number;
 }
 
 interface ServiceModalProps {
@@ -51,6 +53,10 @@ interface ServiceModalProps {
   isBalanceVisible: boolean;
   onClose: () => void;
   onExecuteTransaction: (payload: ExecutePayload) => Transaction | null;
+  onUpdateTransactionSms?: (
+    txId: string,
+    patch: { recipientPhone?: string; recipientBalanceEtb?: number }
+  ) => void;
   onSelectTransaction: (tx: Transaction) => void;
   onOpenService: (
     serviceId: ServiceId,
@@ -71,6 +77,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
   isBalanceVisible,
   onClose,
   onExecuteTransaction,
+  onUpdateTransactionSms,
   onSelectTransaction,
   onOpenService,
   onMarkAllRead,
@@ -78,6 +85,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
   const [recipient, setRecipient] = useState('');
   const [recipientAccount, setRecipientAccount] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
+  const [recipientBalance, setRecipientBalance] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('1234');
@@ -93,16 +101,31 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [smsCopied, setSmsCopied] = useState(false);
   const [receiptSmsPhone, setReceiptSmsPhone] = useState('');
+  const [receiptSmsBalance, setReceiptSmsBalance] = useState('');
+  const [showReceiptSms, setShowReceiptSms] = useState(false);
   const [receiptFeedback, setReceiptFeedback] = useState<string | null>(null);
+
+  const modalKey =
+    modal?.type === 'receipt'
+      ? `receipt:${modal.transaction.id}`
+      : modal?.type === 'service'
+        ? `service:${modal.serviceId}:${modal.presetRecipient ?? ''}:${modal.presetAmount ?? ''}:${modal.presetBillerId ?? ''}`
+        : modal?.type ?? 'none';
 
   useEffect(() => {
     setError(null);
     setCashoutCode(null);
     setShowQrData(false);
+    setShowReceiptSms(false);
     setSmsCopied(false);
     setReceiptFeedback(null);
     if (modal?.type === 'receipt') {
       setReceiptSmsPhone(modal.transaction.recipientPhone ?? '');
+      const initialBal =
+        modal.transaction.recipientBalanceEtb ??
+        modal.transaction.balanceAfterEtb ??
+        account.balanceEtb;
+      setReceiptSmsBalance(formatCbeAmount(initialBal));
     }
     if (modal?.type === 'service') {
       const preset = modal.presetRecipient ?? '';
@@ -118,6 +141,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
         setRecipientAccount(modal.serviceId === 'send' ? '' : preset);
         setRecipientPhone('');
       }
+      setRecipientBalance('');
       setAmount(modal.presetAmount ? String(modal.presetAmount) : '');
       setNote('');
       if (modal.serviceId === 'bills') {
@@ -133,7 +157,8 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
         setAmount('1000');
       }
     }
-  }, [modal, language]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalKey, language]);
 
   if (!modal) return null;
 
@@ -156,12 +181,12 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
   const handleDownloadReceipt = (tx: Transaction) => {
     const fromText =
       tx.direction === 'debit'
-        ? `Teka Wondimu Kerkela (${account.fullNumber})`
+        ? `Webalem Tasfaye (${account.fullNumber})`
         : `${tx.counterparty} (${tx.accountOrPhone})`;
     const toText =
       tx.direction === 'debit'
         ? `${tx.counterparty} (${tx.accountOrPhone})`
-        : `Teka Wondimu Kerkela (${account.fullNumber})`;
+        : `Webalem Tasfaye (${account.fullNumber})`;
 
     const content = [
       'CBE BANK MOBILE BANKING RECEIPT',
@@ -251,11 +276,28 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       ctx.textAlign = 'center';
       ctx.fillText('Transaction Completed Successfully!', 380, 265);
 
+      const fillRoundedRect = (x: number, rectY: number, w: number, h: number, r: number) => {
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(x, rectY, w, h, r);
+        } else {
+          ctx.moveTo(x + r, rectY);
+          ctx.lineTo(x + w - r, rectY);
+          ctx.quadraticCurveTo(x + w, rectY, x + w, rectY + r);
+          ctx.lineTo(x + w, rectY + h - r);
+          ctx.quadraticCurveTo(x + w, rectY + h, x + w - r, rectY + h);
+          ctx.lineTo(x + r, rectY + h);
+          ctx.quadraticCurveTo(x, rectY + h, x, rectY + h - r);
+          ctx.lineTo(x, rectY + r);
+          ctx.quadraticCurveTo(x, rectY, x + r, rectY);
+          ctx.closePath();
+        }
+        ctx.fill();
+      };
+
       // Gray Summary box
       ctx.fillStyle = '#F4F4F6';
-      ctx.beginPath();
-      ctx.roundRect(44, 298, 672, 680, 24);
-      ctx.fill();
+      fillRoundedRect(44, 298, 672, 680, 24);
 
       ctx.textAlign = 'left';
       ctx.fillStyle = '#64748B';
@@ -294,9 +336,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       const qrX = (canvas.width - qrSize) / 2;
       const qrY = Math.max(y + 42, 610);
       ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.roundRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 18);
-      ctx.fill();
+      fillRoundedRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 18);
       ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
       // CBE footer text
@@ -392,6 +432,11 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     if (serviceId === 'send') {
       const targetName = recipient.trim() || 'Tsgie Mesho Mesfn';
       const targetAcct = recipientAccount.trim() || '1000519308397';
+      const cleanedRecBal = recipientBalance.replace(/,/g, '').trim();
+      const parsedRecBal =
+        cleanedRecBal !== '' && !Number.isNaN(Number(cleanedRecBal))
+          ? Number(cleanedRecBal)
+          : undefined;
       payload = {
         title: `Transfer to ${targetName}`,
         titleAm: `ለ${targetName} የተላከ`,
@@ -403,6 +448,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
         feeEtb,
         note: note.trim() || 'MB Transfer',
         recipientPhone: recipientPhone.trim() || undefined,
+        recipientBalanceEtb: parsedRecBal,
       };
     } else if (serviceId === 'transfers') {
       const net = EXTERNAL_NETWORKS.find((n) => n.id === networkId)!;
@@ -541,7 +587,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
             <div className="divide-y divide-slate-100 rounded-xl border border-slate-200/80 px-4">
               <div className="flex items-center justify-between py-3.5 text-sm">
                 <span className="text-slate-500">{t.accountHolder}</span>
-                <span className="font-semibold text-slate-900">Teka Wondimu Kerkela</span>
+                <span className="font-semibold text-slate-900">Webalem Tasfaye</span>
               </div>
               <div className="flex items-center justify-between py-3.5 text-sm">
                 <span className="text-slate-500">{t.accountNumber}</span>
@@ -654,20 +700,23 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
         {/* CBE Bank Transaction Completion Receipt */}
         {modal.type === 'receipt' && (() => {
           const tx = modal.transaction;
-          const totalAmount = tx.amountEtb + tx.feeEtb;
-          const fees = getCbeFeeBreakdown(tx.feeEtb);
-          const senderTail = account.fullNumber.slice(-4);
-          const recipientDigits = tx.accountOrPhone.replace(/\D/g, '').slice(-4) || '8397';
+          const safeAmount = Number.isFinite(tx.amountEtb) ? tx.amountEtb : 0;
+          const safeFee = Number.isFinite(tx.feeEtb) ? tx.feeEtb : 0;
+          const safeAccountOrPhone = tx.accountOrPhone ?? '';
+          const totalAmount = safeAmount + safeFee;
+          const fees = getCbeFeeBreakdown(safeFee);
+          const senderTail = (account.fullNumber ?? '').slice(-4) || '3347';
+          const recipientDigits = safeAccountOrPhone.replace(/\D/g, '').slice(-4) || '8397';
           const reasonText = tx.note || (tx.category === 'transfer' ? 'MB Transfer' : tx.title);
 
           const fromLabel =
             tx.direction === 'debit'
-              ? `Teka Wondimu Kerkela (${account.fullNumber})`
+              ? `Webalem Tasfaye (${account.fullNumber})`
               : `${tx.counterparty} (${tx.accountOrPhone})`;
           const toLabel =
             tx.direction === 'debit'
               ? `${tx.counterparty} (${tx.accountOrPhone})`
-              : `Teka Wondimu Kerkela (${account.fullNumber})`;
+              : `Webalem Tasfaye (${account.fullNumber})`;
 
           const qrTransferPayload = [
             `CBE TRANSFER`,
@@ -681,13 +730,19 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
           ].join('\n');
 
           const smsRecipientName =
-            tx.direction === 'debit' ? tx.counterparty : 'Teka Wondimu Kerkela';
+            tx.direction === 'debit' ? tx.counterparty : 'Webalem Tasfaye';
+          const cleanedReceiptBal = receiptSmsBalance.replace(/,/g, '').trim();
+          const parsedReceiptBalance = Number(cleanedReceiptBal);
+          const effectiveSmsBalance =
+            cleanedReceiptBal !== '' && !Number.isNaN(parsedReceiptBalance)
+              ? parsedReceiptBalance
+              : tx.recipientBalanceEtb ?? tx.balanceAfterEtb ?? account.balanceEtb;
           const smsText = buildCbeSmsText({
             holderName: smsRecipientName,
             accountNumber: account.fullNumber,
             amountEtb: tx.amountEtb,
             feeEtb: tx.feeEtb,
-            currentBalanceEtb: tx.balanceAfterEtb ?? account.balanceEtb,
+            currentBalanceEtb: effectiveSmsBalance,
             reference: tx.reference,
             direction: tx.direction,
             counterparty: tx.counterparty,
@@ -709,8 +764,8 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
 
           const summaryPlainText =
             tx.direction === 'debit'
-              ? `ETB ${tx.amountEtb.toFixed(2)} has been debited from Teka Wondimu Kerkela ETB-${senderTail} for ${tx.counterparty} ETB-${recipientDigits} on ${tx.timestamp} with transaction ID: ${tx.reference}. Reason: ${reasonText} Total Amount Debited: ETB${totalAmount.toFixed(2)} with Service Charge of ETB${fees.serviceCharge.toFixed(2)}, VAT (15%) of ETB${fees.vat.toFixed(2)} and Disaster Recovery (5%) of ETB${fees.disasterRecovery.toFixed(2)}.`
-              : `ETB ${tx.amountEtb.toFixed(2)} has been credited to Teka Wondimu Kerkela ETB-${senderTail} from ${tx.counterparty} on ${tx.timestamp} with transaction ID: ${tx.reference}. Reason: ${reasonText} Total Amount Credited: ETB${tx.amountEtb.toFixed(2)}.`;
+              ? `ETB ${tx.amountEtb.toFixed(2)} has been debited from Webalem Tasfaye ETB-${senderTail} for ${tx.counterparty} ETB-${recipientDigits} on ${tx.timestamp} with transaction ID: ${tx.reference}. Reason: ${reasonText} Total Amount Debited: ETB${totalAmount.toFixed(2)} with Service Charge of ETB${fees.serviceCharge.toFixed(2)}, VAT (15%) of ETB${fees.vat.toFixed(2)} and Disaster Recovery (5%) of ETB${fees.disasterRecovery.toFixed(2)}.`
+              : `ETB ${tx.amountEtb.toFixed(2)} has been credited to Webalem Tasfaye ETB-${senderTail} from ${tx.counterparty} on ${tx.timestamp} with transaction ID: ${tx.reference}. Reason: ${reasonText} Total Amount Credited: ETB${tx.amountEtb.toFixed(2)}.`;
 
           return (
             <div className="min-h-full bg-white">
@@ -774,7 +829,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                       </span>{' '}
                       has been debited from{' '}
                       <span className="font-bold text-slate-950">
-                        Teka Wondimu Kerkela ETB-{senderTail}
+                        Webalem Tasfaye ETB-{senderTail}
                       </span>{' '}
                       for{' '}
                       <span className="font-bold text-slate-950">
@@ -808,7 +863,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                       </span>{' '}
                       has been credited to{' '}
                       <span className="font-bold text-slate-950">
-                        Teka Wondimu Kerkela ETB-{senderTail}
+                        Webalem Tasfaye ETB-{senderTail}
                       </span>{' '}
                       from <span className="font-bold text-slate-950">{tx.counterparty}</span> on{' '}
                       <span className="font-bold text-slate-950">{tx.timestamp}</span> with
@@ -924,8 +979,22 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                   {t.close}
                 </button>
 
-                {/* Official CBE SMS Alert Card + Send Text to Transaction Person */}
-                <div className="mt-4 rounded-2xl border border-slate-200/80 bg-[#1B1D24] p-4 text-white">
+                {/* Subtle Three-Dot Line Toggle for Transaction SMS */}
+                <div className="mt-3 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowReceiptSms((prev) => !prev)}
+                    aria-expanded={showReceiptSms}
+                    aria-label={language === 'am' ? 'የግብይት ኤስኤምኤስ አሳይ' : 'Show transaction SMS'}
+                    className="flex min-h-[38px] min-w-[56px] items-center justify-center rounded-full px-3 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                  >
+                    <MoreHorizontal className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Official CBE SMS Alert Card + Send Text to Transaction Person (Hidden until 3-dot touched) */}
+                {showReceiptSms && (
+                  <div className="mt-2 rounded-2xl border border-slate-200/80 bg-[#1B1D24] p-4 text-white">
                   <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2.5">
                     <div className="flex items-center gap-2">
                       <MessageSquare className="h-4 w-4 text-[#E8C16F]" />
@@ -939,17 +1008,54 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                     {smsText}
                   </p>
 
-                  <div className="mt-3">
-                    <label className="block text-[11px] font-medium text-white/70">
-                      {language === 'am' ? 'የተቀባይ ስልክ ቁጥር' : 'Recipient Phone Number'}
-                    </label>
-                    <input
-                      type="tel"
-                      value={receiptSmsPhone}
-                      onChange={(e) => setReceiptSmsPhone(e.target.value)}
-                      placeholder="+251 911 204 511"
-                      className="mt-1 min-h-[40px] w-full rounded-xl border border-white/15 bg-white/10 px-3 font-mono-nums text-xs text-white placeholder:text-white/40 focus:border-[#E8C16F] focus:outline-none"
-                    />
+                  <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-[11px] font-medium text-white/70">
+                        {language === 'am' ? 'የተቀባይ ስልክ ቁጥር' : 'Recipient Phone Number'}
+                      </label>
+                      <input
+                        type="tel"
+                        value={receiptSmsPhone}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setReceiptSmsPhone(val);
+                          onUpdateTransactionSms?.(tx.id, { recipientPhone: val.trim() || undefined });
+                        }}
+                        placeholder="+251 911 204 511"
+                        className="mt-1 min-h-[40px] w-full rounded-xl border border-white/15 bg-white/10 px-3 font-mono-nums text-xs text-white placeholder:text-white/40 focus:border-[#E8C16F] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-medium text-white/70">
+                        {language === 'am'
+                          ? 'የተቀባይ የአሁን ቀሪ ሂሳብ (ብር)'
+                          : 'Reception Current Balance (ETB)'}
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={receiptSmsBalance}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setReceiptSmsBalance(val);
+                          const cleaned = val.replace(/,/g, '').trim();
+                          const num = Number(cleaned);
+                          if (cleaned !== '' && !Number.isNaN(num) && num >= 0) {
+                            onUpdateTransactionSms?.(tx.id, { recipientBalanceEtb: num });
+                          }
+                        }}
+                        onBlur={() => {
+                          const cleaned = receiptSmsBalance.replace(/,/g, '').trim();
+                          const num = Number(cleaned);
+                          if (cleaned !== '' && !Number.isNaN(num) && num >= 0) {
+                            setReceiptSmsBalance(formatCbeAmount(num));
+                          }
+                        }}
+                        placeholder="1,250,000.00"
+                        className="mt-1 min-h-[40px] w-full rounded-xl border border-white/15 bg-white/10 px-3 font-mono-nums text-xs text-white placeholder:text-white/40 focus:border-[#E8C16F] focus:outline-none"
+                      />
+                    </div>
                   </div>
 
                   <div className="mt-3 grid grid-cols-2 gap-2.5">
@@ -985,7 +1091,8 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                       ? 'የስልክዎን የመልዕክት (Messages) መተግበሪያ ይከፍታል — ለመላክ በስልክዎ ላይ Send ይንኩ።'
                       : 'Opens your phone’s Messages app pre-filled — tap Send in Messages to deliver via your SIM.'}
                   </p>
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -1172,17 +1279,42 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600">
-                        {language === 'am' ? 'የተቀባይ ስልክ (ለኤስኤምኤስ አማራጭ)' : 'Recipient Phone (Optional for SMS)'}
-                      </label>
-                      <input
-                        type="tel"
-                        value={recipientPhone}
-                        onChange={(e) => setRecipientPhone(e.target.value)}
-                        placeholder="+251 911 204 511"
-                        className="mt-1.5 min-h-[44px] w-full rounded-xl border border-slate-200 bg-[#F6F5FA] px-3.5 font-mono-nums text-sm text-slate-900 focus:border-[#4A148C] focus:bg-white focus:outline-none"
-                      />
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600">
+                          {language === 'am' ? 'የተቀባይ ስልክ (ለኤስኤምኤስ አማራጭ)' : 'Recipient Phone (Optional for SMS)'}
+                        </label>
+                        <input
+                          type="tel"
+                          value={recipientPhone}
+                          onChange={(e) => setRecipientPhone(e.target.value)}
+                          placeholder="+251 911 204 511"
+                          className="mt-1.5 min-h-[44px] w-full rounded-xl border border-slate-200 bg-[#F6F5FA] px-3.5 font-mono-nums text-sm text-slate-900 focus:border-[#4A148C] focus:bg-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600">
+                          {language === 'am'
+                            ? 'የተቀባይ የአሁን ቀሪ ሂሳብ (ብር)'
+                            : 'Reception Current Balance (ETB)'}
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={recipientBalance}
+                          onChange={(e) => setRecipientBalance(e.target.value)}
+                          onBlur={() => {
+                            const cleaned = recipientBalance.replace(/,/g, '').trim();
+                            const num = Number(cleaned);
+                            if (cleaned !== '' && !Number.isNaN(num) && num >= 0) {
+                              setRecipientBalance(formatCbeAmount(num));
+                            }
+                          }}
+                          placeholder="e.g. 1,250,000.00"
+                          className="mt-1.5 min-h-[44px] w-full rounded-xl border border-slate-200 bg-[#F6F5FA] px-3.5 font-mono-nums text-sm text-slate-900 focus:border-[#4A148C] focus:bg-white focus:outline-none"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}

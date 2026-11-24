@@ -40,6 +40,13 @@ export function formatCbeSmsAccount(fullNumber: string): string {
   return `${digits.slice(0, 1)}********${digits.slice(-4)}`;
 }
 
+export function formatCbeAmount(value: number): string {
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function buildCbeSmsText(params: {
   holderName: string;
   accountNumber: string;
@@ -53,13 +60,14 @@ export function buildCbeSmsText(params: {
   const smsAcct = formatCbeSmsAccount(params.accountNumber);
   const receiptUrl = `https://mbreciept.cbe.com.et/v2-${params.reference}`;
   const feedbackUrl = 'https://forms.gle/kGNGQpG3mQCCk3iD6';
+  const formattedBalance = formatCbeAmount(params.currentBalanceEtb);
 
   if (params.direction === 'credit') {
     return (
       `Dear ${params.holderName} A credit transaction of ETB ${params.amountEtb.toFixed(2)} ` +
       `has occurred on your account ${smsAcct}` +
       `${params.counterparty ? ` from ${params.counterparty}` : ''}. ` +
-      `Your current balance is ETB ${params.currentBalanceEtb.toFixed(2)}. ` +
+      `Your current balance is ETB ${formattedBalance}. ` +
       `Thanks for Banking with CBE.\n${receiptUrl}  for feedback:\n${feedbackUrl}`
     );
   }
@@ -74,7 +82,7 @@ export function buildCbeSmsText(params: {
     `VAT(15%) of ETB ${fees.vat.toFixed(2)} and ` +
     `Disaster Recovery(5%) of ${fees.disasterRecovery.toFixed(2)} ` +
     `with total of ETB ${total.toFixed(2)}. ` +
-    `Your current balance is ETB ${params.currentBalanceEtb.toFixed(2)}. ` +
+    `Your current balance is ETB ${formattedBalance}. ` +
     `Thanks for Banking with CBE.\n${receiptUrl}  for feedback:\n${feedbackUrl}`
   );
 }

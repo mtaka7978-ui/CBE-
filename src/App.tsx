@@ -65,12 +65,59 @@ function loadInitialState(): PersistedState {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<PersistedState>;
       if (parsed.account && Array.isArray(parsed.transactions)) {
+        const mergedAccount: BankAccount = {
+          ...INITIAL_ACCOUNT,
+          ...parsed.account,
+          fullNumber:
+            typeof parsed.account.fullNumber === 'string' && parsed.account.fullNumber
+              ? parsed.account.fullNumber
+              : INITIAL_ACCOUNT.fullNumber,
+          maskedNumber:
+            typeof parsed.account.maskedNumber === 'string' && parsed.account.maskedNumber
+              ? parsed.account.maskedNumber
+              : INITIAL_ACCOUNT.maskedNumber,
+          balanceEtb:
+            typeof parsed.account.balanceEtb === 'number' && Number.isFinite(parsed.account.balanceEtb)
+              ? parsed.account.balanceEtb
+              : INITIAL_ACCOUNT.balanceEtb,
+        };
+        const sanitizedTransactions: Transaction[] = parsed.transactions
+          .filter(
+            (item): item is Transaction =>
+              Boolean(item && typeof item.id === 'string' && typeof item.amountEtb === 'number' && Number.isFinite(item.amountEtb))
+          )
+          .map((item) => ({
+            ...item,
+            reference: typeof item.reference === 'string' ? item.reference : 'FT26000000',
+            title: typeof item.title === 'string' ? item.title : 'Transfer',
+            titleAm: typeof item.titleAm === 'string' ? item.titleAm : 'ዝውውር',
+            counterparty: typeof item.counterparty === 'string' ? item.counterparty : 'Recipient',
+            accountOrPhone: typeof item.accountOrPhone === 'string' ? item.accountOrPhone : '',
+            feeEtb: typeof item.feeEtb === 'number' && Number.isFinite(item.feeEtb) ? item.feeEtb : 0,
+            timestamp: typeof item.timestamp === 'string' ? item.timestamp : '',
+            direction: item.direction === 'credit' ? 'credit' : 'debit',
+            status: item.status === 'Pending' ? 'Pending' : 'Completed',
+          }));
+        const sanitizedNotifications: NotificationItem[] = Array.isArray(parsed.notifications)
+          ? parsed.notifications.filter(
+              (n): n is NotificationItem =>
+                Boolean(n && typeof n.id === 'string' && typeof n.title === 'string' && typeof n.detail === 'string')
+            )
+          : INITIAL_NOTIFICATIONS;
+        const rawSettings: Partial<UserSettings> = parsed.settings ?? {};
         return {
-          account: parsed.account,
-          transactions: parsed.transactions,
-          notifications: parsed.notifications ?? INITIAL_NOTIFICATIONS,
-          language: parsed.language ?? 'en',
-          settings: parsed.settings ?? INITIAL_SETTINGS,
+          account: mergedAccount,
+          transactions: sanitizedTransactions,
+          notifications: sanitizedNotifications,
+          language: parsed.language === 'am' ? 'am' : 'en',
+          settings: {
+            ...INITIAL_SETTINGS,
+            ...rawSettings,
+            dailyLimitEtb:
+              typeof rawSettings.dailyLimitEtb === 'number' && Number.isFinite(rawSettings.dailyLimitEtb)
+                ? rawSettings.dailyLimitEtb
+                : INITIAL_SETTINGS.dailyLimitEtb,
+          },
         };
       }
     }
@@ -157,6 +204,7 @@ export default function App() {
     feeEtb: number;
     note?: string;
     recipientPhone?: string;
+    recipientBalanceEtb?: number;
   }): Transaction | null => {
     const totalDelta = payload.amountEtb + payload.feeEtb;
     if (payload.direction === 'debit' && totalDelta > account.balanceEtb) {
@@ -197,16 +245,21 @@ export default function App() {
       timestamp: `${datePart} ${timePart}`,
       note: payload.note,
       recipientPhone: payload.recipientPhone,
+      recipientBalanceEtb: payload.recipientBalanceEtb,
       balanceAfterEtb: newBalance,
       status: 'Completed',
     };
 
+    const smsHolderName =
+      payload.direction === 'debit' ? payload.counterparty : 'Webalem Tasfaye';
+    const smsBalanceEtb = payload.recipientBalanceEtb ?? newBalance;
+
     const smsMessage = buildCbeSmsText({
-      holderName: 'Teka Wondimu Kerkela',
+      holderName: smsHolderName,
       accountNumber: account.fullNumber,
       amountEtb: payload.amountEtb,
       feeEtb: payload.feeEtb,
-      currentBalanceEtb: newBalance,
+      currentBalanceEtb: smsBalanceEtb,
       reference,
       direction: payload.direction,
       counterparty: payload.counterparty,
@@ -229,6 +282,20 @@ export default function App() {
     }
     showToast(t.paymentSuccess);
     return tx;
+  };
+
+  const handleUpdateTransactionSms = (
+    txId: string,
+    patch: { recipientPhone?: string; recipientBalanceEtb?: number }
+  ) => {
+    setTransactions((prev) =>
+      prev.map((item) => (item.id === txId ? { ...item, ...patch } : item))
+    );
+    setModal((prev) =>
+      prev?.type === 'receipt' && prev.transaction.id === txId
+        ? { ...prev, transaction: { ...prev.transaction, ...patch } }
+        : prev
+    );
   };
 
   const handleUpdateSettings = (patch: Partial<UserSettings>) => {
@@ -314,7 +381,7 @@ export default function App() {
 
       {/* Main Content Container */}
       <main className="relative z-10 mx-auto max-w-lg lg:max-w-5xl px-4 pt-4 sm:px-6 lg:pt-6">
-        {/* Top Purple Hero Header (Matches Photo: Grid + Hello Teka | English v | Refresh | Search) */}
+        {/* Top Purple Hero Header (Matches Photo: Grid + Hello Webalem | English v | Refresh | Search) */}
         <header className="mb-4 flex items-center justify-between gap-2 text-white">
           <div className="flex items-center gap-3 min-w-0">
             <button
@@ -333,7 +400,7 @@ export default function App() {
                     {language === 'am' ? 'ሰላም,' : 'Hello,'}
                   </p>
                   <h1 className="mt-0.5 truncate text-base sm:text-lg font-bold tracking-tight text-white leading-tight">
-                    {language === 'am' ? 'ተካ' : 'Teka'}
+                    {language === 'am' ? 'ውባለም' : 'Webalem'}
                   </h1>
                 </>
               ) : (
@@ -1084,6 +1151,7 @@ export default function App() {
         isBalanceVisible={isBalanceVisible}
         onClose={() => setModal(null)}
         onExecuteTransaction={handleExecuteTransaction}
+        onUpdateTransactionSms={handleUpdateTransactionSms}
         onSelectTransaction={(tx) => setModal({ type: 'receipt', transaction: tx })}
         onOpenService={handleOpenService}
         onMarkAllRead={() =>
