@@ -224,59 +224,24 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
   ) => {
     try {
       const qrDataUrl = await QRCode.toDataURL(qrPayload, {
-        width: 240,
+        width: 400,
         margin: 1,
         color: { dark: '#111111', light: '#FFFFFF' },
       });
 
       const canvas = document.createElement('canvas');
-      canvas.width = 760;
-      canvas.height = 1040;
+      canvas.width = 1080;
+      canvas.height = 2340;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // White card background
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Purple header
-      ctx.fillStyle = '#6A1B9A';
-      ctx.fillRect(0, 0, canvas.width, 165);
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 30px sans-serif';
-      ctx.fillText('Thank you', 44, 72);
-      ctx.font = '20px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.88)';
-      ctx.fillText('Success', 44, 102);
-
-      // Overlapping checkmark circle
-      ctx.beginPath();
-      ctx.arc(380, 165, 58, 0, Math.PI * 2);
-      ctx.fillStyle = '#6A1B9A';
-      ctx.fill();
-      ctx.lineWidth = 8;
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.stroke();
-
-      // White check stroke
-      ctx.beginPath();
-      ctx.moveTo(354, 165);
-      ctx.lineTo(372, 184);
-      ctx.lineTo(408, 146);
-      ctx.lineWidth = 9;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.stroke();
-
-      // Completed heading
-      ctx.fillStyle = '#0F172A';
-      ctx.font = '600 24px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Transaction Completed Successfully!', 380, 265);
-
-      const fillRoundedRect = (x: number, rectY: number, w: number, h: number, r: number) => {
+      const buildRoundedRectPath = (
+        x: number,
+        rectY: number,
+        w: number,
+        h: number,
+        r: number
+      ) => {
         ctx.beginPath();
         if (typeof ctx.roundRect === 'function') {
           ctx.roundRect(x, rectY, w, h, r);
@@ -292,69 +257,276 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
           ctx.quadraticCurveTo(x, rectY, x + r, rectY);
           ctx.closePath();
         }
-        ctx.fill();
       };
 
-      // Gray Summary box
-      ctx.fillStyle = '#F4F4F6';
-      fillRoundedRect(44, 298, 672, 680, 24);
+      const safeAmount = Number.isFinite(tx.amountEtb) ? tx.amountEtb : 0;
+      const safeFee = Number.isFinite(tx.feeEtb) ? tx.feeEtb : 0;
+      const safeAccountOrPhone = tx.accountOrPhone ?? '';
+      const totalAmount = safeAmount + safeFee;
+      const fees = getCbeFeeBreakdown(safeFee);
+      const senderTail = (account.fullNumber ?? '').slice(-4) || '3347';
+      const recipientDigits = safeAccountOrPhone.replace(/\D/g, '').slice(-4) || '8397';
+      const reasonText = tx.note || (tx.category === 'transfer' ? 'MB Transfer' : tx.title);
 
+      // Base white background (1080 x 2340 mobile portrait screenshot)
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Purple top header backdrop (#7B1FA2 matching CBE receipt)
+      ctx.fillStyle = '#7B1FA2';
+      ctx.fillRect(0, 0, canvas.width, 500);
+
+      // Top-left white Shield-with-Check icon (x=57..122, y=185..266)
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(90, 185);
+      ctx.lineTo(122, 199);
+      ctx.lineTo(122, 226);
+      ctx.quadraticCurveTo(122, 254, 90, 266);
+      ctx.quadraticCurveTo(57, 254, 57, 226);
+      ctx.lineTo(57, 199);
+      ctx.closePath();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(75, 225);
+      ctx.lineTo(86, 236);
+      ctx.lineTo(106, 213);
+      ctx.lineWidth = 7.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#7B1FA2';
+      ctx.stroke();
+      ctx.restore();
+
+      // Header text: Thank you / Success
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#64748B';
-      ctx.font = '500 20px sans-serif';
-      ctx.fillText('Transaction Summary', 74, 344);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '600 58px Roboto, "Plus Jakarta Sans", Arial, sans-serif';
+      ctx.fillText('Thank you', 156, 225);
+      ctx.font = '400 34px Roboto, "Plus Jakarta Sans", Arial, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.fillText('Success', 156, 278);
 
-      // Wrap summary text
-      ctx.fillStyle = '#1E293B';
-      ctx.font = '22px sans-serif';
-      const words = summaryText.split(/\s+/);
-      let line = '';
-      let y = 392;
-      const maxWidth = 612;
-      for (const word of words) {
-        const test = line ? `${line} ${word}` : word;
-        if (ctx.measureText(test).width > maxWidth) {
-          ctx.fillText(line, 74, y);
-          line = word;
-          y += 32;
-        } else {
-          line = test;
+      // Curved white sheet overlapping purple backdrop (y=384, radius=110 at left/right edges)
+      ctx.fillStyle = '#FFFFFF';
+      buildRoundedRectPath(0, 384, canvas.width, canvas.height - 384, 110);
+      ctx.fill();
+
+      // Overlapping centered purple circle with white border
+      ctx.beginPath();
+      ctx.arc(540, 382, 132, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(540, 382, 118, 0, Math.PI * 2);
+      ctx.fillStyle = '#7B1FA2';
+      ctx.fill();
+
+      // Thick white checkmark inside overlapping circle
+      ctx.beginPath();
+      ctx.moveTo(486, 386);
+      ctx.lineTo(524, 424);
+      ctx.lineTo(596, 344);
+      ctx.lineWidth = 24;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.stroke();
+
+      // Completed heading
+      ctx.fillStyle = '#1D1B20';
+      ctx.font = '400 41px Roboto, "Plus Jakarta Sans", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Transaction Completed Successfully!', 540, 584);
+
+      // Build rich inline bold/normal tokens matching CBE receipt word order & bolding
+      const spans: { text: string; bold: boolean }[] =
+        tx.direction === 'debit'
+          ? [
+              { text: 'ETB ', bold: false },
+              { text: safeAmount.toFixed(2), bold: true },
+              { text: ' has been debited from ', bold: false },
+              { text: 'Webalem Tasfaye', bold: true },
+              { text: ` ETB-${senderTail} for `, bold: false },
+              { text: tx.counterparty, bold: true },
+              { text: ` ETB-${recipientDigits} on `, bold: false },
+              { text: tx.timestamp, bold: true },
+              { text: ' with transaction ID: ', bold: false },
+              { text: `${tx.reference}.`, bold: true },
+              {
+                text: ` Reason: ${reasonText} Total Amount Debited: ETB${totalAmount.toFixed(2)} with Service Charge of ETB${fees.serviceCharge.toFixed(2)}, VAT (15%) of ETB${fees.vat.toFixed(2)} and Disaster Recovery (5%) of ETB${fees.disasterRecovery.toFixed(2)}.`,
+                bold: false,
+              },
+            ]
+          : [
+              { text: 'ETB ', bold: false },
+              { text: safeAmount.toFixed(2), bold: true },
+              { text: ' has been credited to ', bold: false },
+              { text: 'Webalem Tasfaye', bold: true },
+              { text: ` ETB-${senderTail} from `, bold: false },
+              { text: tx.counterparty, bold: true },
+              { text: ' on ', bold: false },
+              { text: tx.timestamp, bold: true },
+              { text: ' with transaction ID: ', bold: false },
+              { text: `${tx.reference}.`, bold: true },
+              {
+                text: ` Reason: ${reasonText} Total Amount Credited: ETB${safeAmount.toFixed(2)}.`,
+                bold: false,
+              },
+            ];
+
+      const normalFont = '400 47px Roboto, "Plus Jakarta Sans", Arial, sans-serif';
+      const boldFont = '700 47px Roboto, "Plus Jakarta Sans", Arial, sans-serif';
+      const cardX = 52;
+      const cardY = 635;
+      const cardWidth = 975;
+      const textX = 102;
+      const maxTextWidth = 840;
+      const lineHeight = 67;
+
+      interface WordToken {
+        text: string;
+        bold: boolean;
+      }
+      const tokens: WordToken[] = [];
+      for (const span of spans) {
+        const parts = span.text.split(/(\s+)/);
+        for (const p of parts) {
+          if (p) tokens.push({ text: p, bold: span.bold });
         }
       }
-      if (line) {
-        ctx.fillText(line, 74, y);
+
+      const lines: WordToken[][] = [];
+      let currentLine: WordToken[] = [];
+      let currentWidth = 0;
+
+      for (const tok of tokens) {
+        const isSpace = /^\s+$/.test(tok.text);
+        if (isSpace && currentLine.length === 0) continue;
+        ctx.font = tok.bold ? boldFont : normalFont;
+        const w = ctx.measureText(tok.text).width;
+        if (!isSpace && currentWidth + w > maxTextWidth && currentLine.length > 0) {
+          while (currentLine.length > 0 && /^\s+$/.test(currentLine[currentLine.length - 1].text)) {
+            currentLine.pop();
+          }
+          lines.push(currentLine);
+          currentLine = [tok];
+          currentWidth = w;
+        } else {
+          currentLine.push(tok);
+          currentWidth += w;
+        }
+      }
+      if (currentLine.length > 0) {
+        lines.push(currentLine);
       }
 
-      // Draw QR code image
+      const textStartY = 800;
+      const textEndY = textStartY + Math.max(lines.length - 1, 0) * lineHeight;
+      const qrBoxSize = 380;
+      const qrY = Math.max(textEndY + 22, 1362);
+      const cardHeight = Math.max(qrY + qrBoxSize + 180 - cardY, 1287);
+
+      // Soft shadowed Gray Summary Card (#F2F2F2 matching reference)
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.16)';
+      ctx.shadowBlur = 22;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 6;
+      ctx.fillStyle = '#F2F2F2';
+      buildRoundedRectPath(cardX, cardY, cardWidth, cardHeight, 44);
+      ctx.fill();
+      ctx.restore();
+
+      // Card label: Transaction Summary (#9E9E9E)
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#9E9E9E';
+      ctx.font = '400 44px Roboto, "Plus Jakarta Sans", Arial, sans-serif';
+      ctx.fillText('Transaction Summary', textX, 718);
+
+      // Draw wrapped mixed normal/bold text — PURE BLACK (#000000) for ALL words
+      lines.forEach((lineTokens, lineIdx) => {
+        let cursorX = textX;
+        const lineY = textStartY + lineIdx * lineHeight;
+        for (const tok of lineTokens) {
+          ctx.font = tok.bold ? boldFont : normalFont;
+          ctx.fillStyle = '#000000';
+          ctx.fillText(tok.text, cursorX, lineY);
+          cursorX += ctx.measureText(tok.text).width;
+        }
+      });
+
+      // Draw QR code image inside bordered rounded frame
       const qrImg = new Image();
       await new Promise<void>((resolve, reject) => {
         qrImg.onload = () => resolve();
         qrImg.onerror = () => reject(new Error('QR image load failed'));
         qrImg.src = qrDataUrl;
       });
-      const qrSize = 230;
-      const qrX = (canvas.width - qrSize) / 2;
-      const qrY = Math.max(y + 42, 610);
+      const qrBoxX = (canvas.width - qrBoxSize) / 2;
       ctx.fillStyle = '#FFFFFF';
-      fillRoundedRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 18);
-      ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+      buildRoundedRectPath(qrBoxX, qrY, qrBoxSize, qrBoxSize, 34);
+      ctx.fill();
+      ctx.lineWidth = 4.5;
+      ctx.strokeStyle = '#7F7F7F';
+      ctx.stroke();
+      const qrInnerPad = 18;
+      ctx.drawImage(
+        qrImg,
+        qrBoxX + qrInnerPad,
+        qrY + qrInnerPad,
+        qrBoxSize - qrInnerPad * 2,
+        qrBoxSize - qrInnerPad * 2
+      );
 
-      // CBE footer text
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#334155';
-      ctx.font = 'bold 22px sans-serif';
-      ctx.fillText('Commercial Bank of Ethiopia', 380, qrY + qrSize + 52);
-      ctx.fillStyle = '#64748B';
-      ctx.font = '18px sans-serif';
-      ctx.fillText('The bank you can always rely on!', 380, qrY + qrSize + 82);
+      // Draw official CBE golden logo + Commercial Bank of Ethiopia footer inside card
+      const logoImg = new Image();
+      const logoLoaded = await new Promise<boolean>((resolve) => {
+        logoImg.onload = () => resolve(true);
+        logoImg.onerror = () => resolve(false);
+        logoImg.src = '/cbe-logo.png';
+      });
 
-      const pngUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = pngUrl;
-      link.download = `${tx.reference}-cbe-screenshot.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const brandTitle = 'Commercial Bank of Ethiopia';
+      const brandSub = 'The bank you can always rely on!';
+      const footerY = qrY + qrBoxSize + 24;
+
+      if (logoLoaded) {
+        ctx.drawImage(logoImg, 128, footerY, 108, 108);
+      }
+
+      const brandTextX = logoLoaded ? 270 : 128;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#424242';
+      ctx.font = '700 37px Roboto, "Plus Jakarta Sans", Arial, sans-serif';
+      ctx.fillText(brandTitle, brandTextX, footerY + 42);
+      ctx.fillStyle = '#616161';
+      ctx.font = '400 31px Roboto, "Plus Jakarta Sans", Arial, sans-serif';
+      ctx.fillText(brandSub, brandTextX, footerY + 86);
+
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), 'image/png')
+      );
+      if (blob) {
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `${tx.reference}-cbe-screenshot.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
+      } else {
+        const pngUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = pngUrl;
+        link.download = `${tx.reference}-cbe-screenshot.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
       showReceiptNote(language === 'am' ? 'ስክሪንሾት ተቀምጧል' : 'Screenshot saved');
     } catch {
       handleDownloadReceipt(tx);
@@ -557,10 +729,10 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       }}
     >
       <div
-        className={`w-full max-w-lg overflow-y-auto bg-white ${
+        className={`w-full max-w-lg bg-white ${
           modal.type === 'receipt'
-            ? 'min-h-screen sm:min-h-0 sm:max-h-[92vh] sm:rounded-2xl sm:shadow-2xl p-0'
-            : 'max-h-[92vh] rounded-t-3xl shadow-2xl sm:rounded-2xl p-5 sm:p-6'
+            ? 'h-[100dvh] overflow-y-auto sm:h-auto sm:max-h-[92vh] sm:rounded-2xl sm:shadow-2xl p-0'
+            : 'max-h-[92vh] overflow-y-auto rounded-t-3xl shadow-2xl sm:rounded-2xl p-5 sm:p-6'
         }`}
       >
         {modal.type !== 'receipt' && (
@@ -768,19 +940,19 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
               : `ETB ${tx.amountEtb.toFixed(2)} has been credited to Webalem Tasfaye ETB-${senderTail} from ${tx.counterparty} on ${tx.timestamp} with transaction ID: ${tx.reference}. Reason: ${reasonText} Total Amount Credited: ETB${tx.amountEtb.toFixed(2)}.`;
 
           return (
-            <div className="min-h-full bg-white">
-              {/* Sticky Purple Receipt Top Bar */}
-              <div className="sticky top-0 z-30 bg-[#6A1B9A] px-5 pt-4 pb-3 text-white">
+            <div className="min-h-full bg-white flex flex-col">
+              {/* Purple Receipt Top Bar */}
+              <div className="bg-[#7B1FA2] px-4 pt-3 pb-2 text-white shrink-0">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
-                      <ShieldCheck className="h-6 w-6 text-white" />
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15">
+                      <ShieldCheck className="h-5 w-5 text-white" />
                     </div>
                     <div>
                       <h2 className="text-lg font-bold leading-tight text-white">
                         {language === 'am' ? 'እናመሰግናለን' : 'Thank you'}
                       </h2>
-                      <p className="text-xs font-medium text-white/85">
+                      <p className="text-[11px] font-medium text-white/90">
                         {language === 'am' ? 'ተሳክቷል' : 'Success'}
                       </p>
                     </div>
@@ -793,113 +965,92 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                     }
                     aria-label={language === 'am' ? 'ስክሪንሾት' : 'Screenshot'}
                     title={language === 'am' ? 'ስክሪንሾት' : 'Screenshot'}
-                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-white/90 transition-colors hover:bg-white/15 hover:text-white"
+                    className="flex min-h-[38px] min-w-[38px] items-center justify-center rounded-xl text-white/90 transition-colors hover:bg-white/15 hover:text-white"
                   >
-                    <Scan className="h-6 w-6" />
+                    <Scan className="h-5 w-5" />
                   </button>
                 </div>
               </div>
 
               {/* Purple Backing Behind Overlapping Checkmark */}
-              <div aria-hidden="true" className="relative z-10 h-12 bg-[#6A1B9A]" />
+              <div aria-hidden="true" className="relative z-10 h-8 bg-[#7B1FA2] shrink-0" />
 
-              {/* White Curved Sheet Overlapping Purple Header */}
-              <div className="relative z-20 -mt-8 rounded-t-[32px] bg-white px-5 pb-8 pt-13 sm:px-6">
+              {/* White Curved Sheet Overlapping Purple Header (Fits single screen with no downward scroll) */}
+              <div className="relative z-20 -mt-5 flex-1 rounded-t-[28px] bg-white px-4 pb-3 pt-10 sm:px-5">
                 {/* Overlapping Purple Circle Checkmark */}
-                <div className="absolute -top-11 left-1/2 flex h-[84px] w-[84px] -translate-x-1/2 items-center justify-center rounded-full border-[5px] border-white bg-[#6A1B9A] shadow-md">
-                  <Check className="h-10 w-10 stroke-[3.2] text-white" />
+                <div className="absolute -top-9 left-1/2 flex h-[70px] w-[70px] -translate-x-1/2 items-center justify-center rounded-full border-[4px] border-white bg-[#7B1FA2] shadow-md">
+                  <Check className="h-8 w-8 stroke-[3.5] text-white" />
                 </div>
 
-                <p className="text-center text-sm sm:text-base font-semibold text-slate-900">
+                <p className="text-center text-[13.5px] sm:text-sm font-medium text-slate-900">
                   {language === 'am'
                     ? 'ግብይቱ በተሳካ ሁኔታ ተጠናቋል!'
                     : 'Transaction Completed Successfully!'}
                 </p>
 
                 {/* Transaction Summary Card */}
-                <div className="mt-4 rounded-2xl border border-slate-200/75 bg-[#F4F4F6] p-4 sm:p-5 shadow-xs">
-                  <p className="text-xs font-medium text-slate-500">
+                <div className="mt-2 rounded-2xl border border-slate-200/80 bg-[#F2F2F2] px-4 py-3 shadow-sm">
+                  <p className="text-[13px] font-normal text-[#9E9E9E]">
                     {language === 'am' ? 'የግብይት ማጠቃለያ' : 'Transaction Summary'}
                   </p>
 
                   {tx.direction === 'debit' ? (
-                    <p className="mt-2.5 text-sm leading-relaxed text-slate-800">
-                      <span className="font-mono-nums font-bold text-slate-950">
-                        ETB {tx.amountEtb.toFixed(2)}
+                    <p className="mt-1.5 text-[15px] leading-[1.42] text-black">
+                      ETB{' '}
+                      <span className="font-bold text-black">
+                        {tx.amountEtb.toFixed(2)}
                       </span>{' '}
                       has been debited from{' '}
-                      <span className="font-bold text-slate-950">
-                        Webalem Tasfaye ETB-{senderTail}
-                      </span>{' '}
-                      for{' '}
-                      <span className="font-bold text-slate-950">
-                        {tx.counterparty} ETB-{recipientDigits}
-                      </span>{' '}
-                      on <span className="font-bold text-slate-950">{tx.timestamp}</span> with
+                      <span className="font-bold text-black">Webalem Tasfaye</span>{' '}
+                      ETB-{senderTail} for{' '}
+                      <span className="font-bold text-black">{tx.counterparty}</span>{' '}
+                      ETB-{recipientDigits} on{' '}
+                      <span className="font-bold text-black">{tx.timestamp}</span> with
                       transaction ID:{' '}
-                      <span className="font-mono-nums font-bold text-slate-950">
-                        {tx.reference}
-                      </span>
-                      . Reason: {reasonText}. Total Amount Debited:{' '}
-                      <span className="font-mono-nums font-semibold text-slate-950">
-                        ETB{totalAmount.toFixed(2)}
-                      </span>{' '}
-                      with Service Charge of{' '}
-                      <span className="font-mono-nums">
-                        ETB{fees.serviceCharge.toFixed(2)}
-                      </span>
-                      , VAT (15%) of{' '}
-                      <span className="font-mono-nums">ETB{fees.vat.toFixed(2)}</span> and Disaster
-                      Recovery (5%) of{' '}
-                      <span className="font-mono-nums">
-                        ETB{fees.disasterRecovery.toFixed(2)}
-                      </span>
-                      .
+                      <span className="font-bold text-black">{tx.reference}.</span>{' '}
+                      Reason: {reasonText} Total Amount Debited: ETB{totalAmount.toFixed(2)} with
+                      Service Charge of ETB{fees.serviceCharge.toFixed(2)}, VAT (15%) of ETB
+                      {fees.vat.toFixed(2)} and Disaster Recovery (5%) of ETB
+                      {fees.disasterRecovery.toFixed(2)}.
                     </p>
                   ) : (
-                    <p className="mt-2.5 text-sm leading-relaxed text-slate-800">
-                      <span className="font-mono-nums font-bold text-slate-950">
-                        ETB {tx.amountEtb.toFixed(2)}
+                    <p className="mt-1.5 text-[15px] leading-[1.42] text-black">
+                      ETB{' '}
+                      <span className="font-bold text-black">
+                        {tx.amountEtb.toFixed(2)}
                       </span>{' '}
                       has been credited to{' '}
-                      <span className="font-bold text-slate-950">
-                        Webalem Tasfaye ETB-{senderTail}
-                      </span>{' '}
-                      from <span className="font-bold text-slate-950">{tx.counterparty}</span> on{' '}
-                      <span className="font-bold text-slate-950">{tx.timestamp}</span> with
+                      <span className="font-bold text-black">Webalem Tasfaye</span>{' '}
+                      ETB-{senderTail} from{' '}
+                      <span className="font-bold text-black">{tx.counterparty}</span> on{' '}
+                      <span className="font-bold text-black">{tx.timestamp}</span> with
                       transaction ID:{' '}
-                      <span className="font-mono-nums font-bold text-slate-950">
-                        {tx.reference}
-                      </span>
-                      . Reason: {reasonText}. Total Amount Credited:{' '}
-                      <span className="font-mono-nums font-semibold text-slate-950">
-                        ETB{tx.amountEtb.toFixed(2)}
-                      </span>
-                      .
+                      <span className="font-bold text-black">{tx.reference}.</span>{' '}
+                      Reason: {reasonText} Total Amount Credited: ETB{tx.amountEtb.toFixed(2)}.
                     </p>
                   )}
 
                   {/* Centered Scannable Receipt QR Code (Encodes From -> To Accounts) */}
-                  <div className="mt-5 flex flex-col items-center">
+                  <div className="mt-2.5 flex flex-col items-center">
                     <button
                       type="button"
                       onClick={() => setShowQrData((prev) => !prev)}
                       title="Tap to view QR transfer accounts"
-                      className="rounded-2xl border-2 border-slate-500/70 bg-white p-1.5 transition-transform hover:scale-[1.01] focus-visible:outline-2 focus-visible:outline-[#6A1B9A]"
+                      className="rounded-xl border-[1.5px] border-[#7F7F7F] bg-white p-1 transition-transform hover:scale-[1.01] focus-visible:outline-2 focus-visible:outline-[#7B1FA2]"
                     >
-                      <QrMatrix payload={qrTransferPayload} size={156} />
+                      <QrMatrix payload={qrTransferPayload} size={120} />
                     </button>
 
                     {/* Commercial Bank of Ethiopia Golden Emblem directly under QR code */}
-                    <div className="mt-3.5 flex items-center justify-center gap-3">
-                      <CbeLogo size={62} className="shrink-0" />
+                    <div className="mt-2 flex items-center justify-center gap-2.5">
+                      <CbeLogo size={44} className="shrink-0" />
                       <div>
-                        <p className="text-sm font-bold text-slate-700">
+                        <p className="text-[13px] font-bold text-slate-700 leading-tight">
                           {language === 'am'
                             ? 'የኢትዮጵያ ንግድ ባንክ'
                             : 'Commercial Bank of Ethiopia'}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-[11px] text-slate-500 leading-tight">
                           {language === 'am'
                             ? 'ሁልጊዜ የሚታመኑበት ባንክ!'
                             : 'The bank you can always rely on!'}
@@ -908,7 +1059,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                     </div>
 
                     {showQrData && (
-                      <div className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-xs text-slate-700 space-y-1">
+                      <div className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-left text-xs text-slate-700 space-y-1">
                         <p>
                           <span className="font-semibold text-slate-900">TX ID:</span>{' '}
                           <span className="font-mono-nums font-semibold">{tx.reference}</span>{' '}
@@ -934,13 +1085,13 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                 </div>
 
                 {/* 3-Item Receipt Action Row (Receipt | Screenshot | Share) + Full-Width Close Button */}
-                <div className="mt-5 grid grid-cols-3 gap-2">
+                <div className="mt-2.5 grid grid-cols-3 gap-1.5">
                   <button
                     type="button"
                     onClick={() => handleDownloadReceipt(tx)}
-                    className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs sm:text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 whitespace-nowrap"
+                    className="flex min-h-[36px] items-center justify-center gap-1 rounded-xl px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 whitespace-nowrap"
                   >
-                    <ReceiptText className="h-4 w-4 text-slate-700 shrink-0" />
+                    <ReceiptText className="h-3.5 w-3.5 text-slate-700 shrink-0" />
                     <span>{language === 'am' ? 'ደረሰኝ' : 'Receipt'}</span>
                   </button>
 
@@ -949,24 +1100,24 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                     onClick={() =>
                       handleScreenshotReceipt(tx, summaryPlainText, qrTransferPayload)
                     }
-                    className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs sm:text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 whitespace-nowrap"
+                    className="flex min-h-[36px] items-center justify-center gap-1 rounded-xl px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 whitespace-nowrap"
                   >
-                    <Scan className="h-4 w-4 text-slate-700 shrink-0" />
+                    <Scan className="h-3.5 w-3.5 text-slate-700 shrink-0" />
                     <span>{language === 'am' ? 'ስክሪንሾት' : 'Screenshot'}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleShareReceipt(tx, summaryPlainText)}
-                    className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs sm:text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 whitespace-nowrap"
+                    className="flex min-h-[36px] items-center justify-center gap-1 rounded-xl px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 whitespace-nowrap"
                   >
-                    <Share2 className="h-4 w-4 text-slate-700 shrink-0" />
+                    <Share2 className="h-3.5 w-3.5 text-slate-700 shrink-0" />
                     <span>{language === 'am' ? 'አጋራ' : 'Share'}</span>
                   </button>
                 </div>
 
                 {receiptFeedback && (
-                  <p className="mt-1.5 text-center text-xs font-medium text-[#6A1B9A]">
+                  <p className="mt-1 text-center text-[11px] font-medium text-[#6A1B9A]">
                     {receiptFeedback}
                   </p>
                 )}
@@ -974,21 +1125,21 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="mt-2.5 flex min-h-[50px] w-full items-center justify-center rounded-full bg-[#E3E5EA] px-6 text-base font-semibold text-slate-700 transition-colors hover:bg-[#D5D8E0] active:scale-[0.99]"
+                  className="mt-1.5 flex min-h-[42px] w-full items-center justify-center rounded-full bg-[#E3E5EA] px-6 text-sm font-semibold text-slate-700 transition-colors hover:bg-[#D5D8E0] active:scale-[0.99]"
                 >
                   {t.close}
                 </button>
 
                 {/* Subtle Three-Dot Line Toggle for Transaction SMS */}
-                <div className="mt-3 flex justify-center">
+                <div className="mt-1 flex justify-center">
                   <button
                     type="button"
                     onClick={() => setShowReceiptSms((prev) => !prev)}
                     aria-expanded={showReceiptSms}
                     aria-label={language === 'am' ? 'የግብይት ኤስኤምኤስ አሳይ' : 'Show transaction SMS'}
-                    className="flex min-h-[38px] min-w-[56px] items-center justify-center rounded-full px-3 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                    className="flex min-h-[26px] min-w-[48px] items-center justify-center rounded-full px-3 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                   >
-                    <MoreHorizontal className="h-5 w-5" />
+                    <MoreHorizontal className="h-4 w-4" />
                   </button>
                 </div>
 

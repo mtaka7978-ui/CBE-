@@ -221,11 +221,11 @@ export default function App() {
     const now = new Date();
     const datePart = now.toLocaleDateString('en-US', {
       month: 'short',
-      day: 'numeric',
+      day: '2-digit',
       year: 'numeric',
     });
     const timePart = now.toLocaleTimeString('en-US', {
-      hour: 'numeric',
+      hour: '2-digit',
       minute: '2-digit',
       hour12: true,
     });
