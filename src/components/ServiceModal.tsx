@@ -5,7 +5,6 @@ import {
   Check,
   Copy,
   MessageSquare,
-  MoreHorizontal,
   ReceiptText,
   Scan,
   Send,
@@ -1130,7 +1129,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                   {t.close}
                 </button>
 
-                {/* Subtle Three-Dot Line Toggle for Transaction SMS */}
+                {/* Subtle Single-Dot Toggle for Transaction SMS */}
                 <div className="mt-1 flex justify-center">
                   <button
                     type="button"
@@ -1139,11 +1138,11 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                     aria-label={language === 'am' ? 'የግብይት ኤስኤምኤስ አሳይ' : 'Show transaction SMS'}
                     className="flex min-h-[26px] min-w-[48px] items-center justify-center rounded-full px-3 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                   >
-                    <MoreHorizontal className="h-4 w-4" />
+                    <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
                   </button>
                 </div>
 
-                {/* Official CBE SMS Alert Card + Send Text to Transaction Person (Hidden until 3-dot touched) */}
+                {/* Official CBE SMS Alert Card + Send Text to Transaction Person (Hidden until dot touched) */}
                 {showReceiptSms && (
                   <div className="mt-2 rounded-2xl border border-slate-200/80 bg-[#1B1D24] p-4 text-white">
                   <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2.5">
